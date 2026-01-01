@@ -5,13 +5,13 @@
 # ============================================
 #
 # 功能说明:
-# 1. 自动安装运行环境 (.NET 9.0)
-# 2. 从 GitHub/Gitee 下载最新版本
+# 1. 自动安装系统依赖
+# 2. 从 GitHub/Gitee 下载自包含版本服务器
 # 3. 克隆资源文件
-# 4. 交互式配置 Config.json
-# 5. 创建 dh 用户并配置权限
-# 6. Screen 后台运行
-# 7. 防火墙配置
+# 4. 创建 dh 用户并配置权限
+# 5. 配置防火墙
+# 6. 后台运行并自动生成/配置 Config.json
+# 7. 无需手动安装 .NET 环境 (Self-contained)
 #
 # 使用方法:
 #   交互模式: bash deploy.sh
@@ -399,11 +399,11 @@ clone_resources() {
 }
 
 # ============================================
-# 步骤 8: 配置 Config.json (服务启动后执行)
+# 步骤 7: 配置 Config.json (服务启动后执行)
 # ============================================
 
 configure_server() {
-    log_step 8 "配置 Config.json..."
+    log_step 7 "配置 Config.json..."
     
     local config_path="$INSTALL_DIR/Config.json"
     
@@ -485,11 +485,11 @@ configure_server() {
 }
 
 # ============================================
-# 步骤 6: 创建用户和权限
+# 步骤 4: 创建用户和权限
 # ============================================
 
 setup_user() {
-    log_step 5 "配置用户和权限..."
+    log_step 4 "配置用户和权限..."
     
     # 创建 dh 用户
     if ! id "$SERVICE_USER" &>/dev/null; then
@@ -510,18 +510,17 @@ setup_user() {
 }
 
 # ============================================
-# 步骤 7: 配置防火墙
+# 步骤 5: 配置防火墙
 # ============================================
 
 configure_firewall() {
-    log_step 6 "配置防火墙..."
+    log_step 5 "配置防火墙..."
     
     if [ "$SKIP_FIREWALL" = true ]; then
         log_info "跳过防火墙配置"
         return 0
     fi
     
-    # 检测防火墙类型并配置
     # 检测防火墙类型并配置
     if command -v ufw &> /dev/null; then
         log_info "检测到 UFW..."
@@ -561,11 +560,11 @@ configure_firewall() {
 }
 
 # ============================================
-# 步骤 8: 启动服务
+# 步骤 6: 启动服务
 # ============================================
 
 start_server() {
-    log_step 7 "启动服务..."
+    log_step 6 "启动服务..."
     
     cd "$INSTALL_DIR"
     
@@ -607,7 +606,7 @@ start_server() {
 # 主流程
 # ============================================
 
-TOTAL_STEPS=8
+TOTAL_STEPS=7
 
 main() {
     echo ""
