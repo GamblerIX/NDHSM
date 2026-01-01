@@ -134,8 +134,9 @@ install_proot_distro() {
 install_debian() {
     log_step 3 "安装 Debian 12..."
     
-    # 检查是否已安装
-    if proot-distro list | grep -q "debian.*installed"; then
+    # 检查是否已安装（检测 rootfs 目录）
+    local rootfs_dir="$PREFIX/var/lib/proot-distro/installed-rootfs/debian"
+    if [ -d "$rootfs_dir" ]; then
         log_info "Debian 已安装"
         return 0
     fi
@@ -145,9 +146,10 @@ install_debian() {
     # 安装 Debian
     proot-distro install "$DEBIAN_DISTRO"
     
-    # 验证安装
-    if proot-distro list | grep -q "debian.*installed"; then
-        log_success "Debian 12 安装完成"
+    # 验证安装（检查 rootfs 目录是否存在）
+    local rootfs_dir="$PREFIX/var/lib/proot-distro/installed-rootfs/debian"
+    if [ -d "$rootfs_dir" ]; then
+        log_success "Debian 安装完成"
     else
         log_error "Debian 安装失败"
         exit 1
@@ -158,9 +160,8 @@ install_debian() {
     
     proot-distro login "$DEBIAN_DISTRO" -- bash -c '
 cat > /etc/apt/sources.list << EOF
-deb https://mirrors.ustc.edu.cn/debian bookworm main contrib non-free non-free-firmware
-deb https://mirrors.ustc.edu.cn/debian bookworm-updates main contrib non-free non-free-firmware
-deb https://mirrors.ustc.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian trixie main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian trixie-updates main contrib non-free non-free-firmware
 EOF
 apt-get update -qq
 '
