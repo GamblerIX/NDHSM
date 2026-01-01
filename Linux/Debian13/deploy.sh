@@ -599,18 +599,17 @@ start_server() {
     # 使用 screen 启动
     log_info "使用 screen 启动服务..."
     
-    # .NET 环境变量 (解决 Termux proot 内存限制问题)
-    export DOTNET_GCHeapHardLimit=200000000        # 限制 GC 堆为 ~200MB
-    export DOTNET_EnableDiagnostics=0              # 禁用诊断
-    export DOTNET_gcServer=0                       # 使用工作站 GC 模式
-    
-    # 检测是否在 Termux proot 环境 (用户切换可能失败)
-    if [ -f /etc/proot-distro ] || [ "$EUID" -eq 0 ] && ! command -v sudo &>/dev/null; then
-        # Termux 环境：直接以当前用户启动
+    # 检测是否在 Termux proot 环境
+    if [ -f /etc/proot-distro ] || { [ "$EUID" -eq 0 ] && ! command -v sudo &>/dev/null; }; then
+        # Termux 环境：设置 .NET GC 环境变量解决内存限制问题，直接以当前用户启动
+        log_info "检测到 Termux proot 环境，启用 GC 内存限制"
+        export DOTNET_GCHeapHardLimit=200000000
+        export DOTNET_EnableDiagnostics=0
+        export DOTNET_gcServer=0
         screen -dmS danheng "$server_exe"
     else
         # 标准 Linux 环境：以服务用户启动
-        su - "$SERVICE_USER" -c "cd $INSTALL_DIR && DOTNET_GCHeapHardLimit=200000000 DOTNET_EnableDiagnostics=0 DOTNET_gcServer=0 screen -dmS danheng $server_exe"
+        su - "$SERVICE_USER" -c "cd $INSTALL_DIR && screen -dmS danheng $server_exe"
     fi
     
     sleep 3
