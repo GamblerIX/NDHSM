@@ -514,18 +514,13 @@ setup_user() {
         log_info "用户 $SERVICE_USER 已存在"
     fi
     
-    # 检查并修复目录权限 (仅在权限不正确时才修改)
-    local current_owner=$(stat -c '%U' "$INSTALL_DIR" 2>/dev/null)
-    if [ "$current_owner" != "$SERVICE_USER" ]; then
-        log_info "设置目录权限 (此操作可能需要较长时间)..."
-        chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
-        chmod -R 755 "$INSTALL_DIR"
+    # 仅设置 DanhengServer 可执行权限
+    if [ -f "$INSTALL_DIR/DanhengServer" ]; then
+        chmod +x "$INSTALL_DIR/DanhengServer"
+        log_success "权限配置完成"
+    else
+        log_warning "DanhengServer 不存在，跳过权限设置"
     fi
-    
-    # 设置可执行权限
-    find "$INSTALL_DIR" -name "DanhengServer" -o -name "GameServer" | xargs chmod +x 2>/dev/null || true
-    
-    log_success "权限配置完成"
 }
 
 # ============================================
