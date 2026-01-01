@@ -43,14 +43,13 @@ NDHSM/
 
 ### deploy.sh 部署流程
 
-1. **配置中科大 APT 源** - 加速包下载
-2. **安装依赖** - curl, wget, git, screen, jq
-3. **下载服务器** - 从 GitHub Releases 获取最新版本
-4. **克隆资源文件** - DanHengServerResources
-5. **配置 Config.json** - 交互式或无头模式
-6. **创建 dh 用户** - 权限隔离
-7. **配置防火墙** - 开放服务端口
-8. **启动服务** - screen 后台运行
+1. **安装依赖** - curl, wget, git, screen, jq
+2. **下载服务器** - 从 Gitee/GitHub Releases 获取自包含版本
+3. **克隆资源文件** - DanHengServerResources
+4. **创建 dh 用户** - 设置可执行权限
+5. **配置防火墙** - 开放服务端口 (可选)
+6. **启动服务** - screen 后台运行
+7. **配置 Config.json** - 服务启动后自动生成并修改
 
 ### 命令行参数
 
@@ -62,6 +61,7 @@ NDHSM/
 | `--game-port PORT` | 游戏端口（默认 23301） |
 | `--host HOST` | 公网地址 |
 | `--skip-firewall` | 跳过防火墙配置 |
+| `--gc-limit MB` | 手动设置 .NET GC 内存限制（单位 MB） |
 
 ## 📱 Termux 环境
 
