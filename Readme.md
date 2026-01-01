@@ -1,111 +1,80 @@
-# NDHSM - DanHeng Server Manager
+# NDHSM - New DanHeng Server Manager
 
-一套跨平台的 DanHeng 私服管理工具集，支持 Windows GUI、Linux 自动化部署和 Termux（Android）环境。
+一套跨平台的 DanHeng 私服管理工具集，支持 Windows、Linux 和 Termux（Android）。
 
-## 📦 项目结构
+## 🚀 一键部署
 
-```
-NDHSM/
-├── Windows/                    # Windows 管理工具 (Python + PySide6 Fluent)
-│   ├── main.py                # 程序入口
-│   ├── main_window.py         # 主界面
-│   ├── config.py              # 配置管理
-│   ├── muip_client.py         # MUIP API 客户端
-│   ├── auto_setup.py          # 自动配置
-│   ├── proxy_manager.py       # 代理管理
-│   └── requirements.txt       # Python 依赖
-├── Linux/
-│   ├── Debian12/
-│   │   └── deploy.sh          # Debian 12 全自动部署脚本
-│   └── TermuxToDebian12/
-│       └── setup_debian.sh    # Termux 安装 Debian 脚本
-└── Docs/
-    └── requirements.md        # 需求文档
-```
-
-## 🚀 快速开始
-
-### Windows 管理工具
+### Linux Debian 12
 
 ```bash
-cd NDHSM/Windows
-pip install -r requirements.txt
-python main.py
-```
-
-**功能特性：**
-- 🎨 PySide6 Fluent 现代化界面
-- ⚙️ 一键自动配置（下载/编译服务器、克隆资源）
-- 🔐 MUIP API 集成（RSA 加密认证）
-- 📡 命令远程执行
-- 🌐 代理一键启动
-
-### Linux Debian 12 部署
-
-```bash
-# 下载并运行部署脚本
+# GitHub 源
 curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian12/deploy.sh | sudo bash
 
-# 或无头模式
-sudo bash deploy.sh --headless --http-port 520 --game-port 23301
-
-# 使用 Gitee 镜像（国内加速）
-sudo bash deploy.sh --headless --gitee
+# Gitee 源（国内推荐）
+curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian12/deploy.sh | sudo bash
 ```
 
-**部署流程：**
-1. 配置中科大 APT 源
-2. 安装 .NET 9.0 运行时
-3. 下载最新 DanHengServer Release
-4. 克隆资源文件
-5. 交互式配置 Config.json
-6. 创建 `dh` 用户并配置权限
-7. Screen 后台运行
-8. 自动配置防火墙
+**无头模式（跳过交互）：**
+```bash
+curl -sSL <脚本地址> | sudo bash -s -- --headless --gitee
+```
 
 ### Termux (Android)
 
 ```bash
-# 1. 安装 Debian 12 环境
-bash setup_debian.sh
+# GitHub 源
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/TermuxToDebian12/setup_debian.sh | bash
 
-# 2. 进入 Debian
-debian
-
-# 3. 在 Debian 中运行部署脚本
-bash deploy.sh
+# Gitee 源（国内推荐）
+curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/TermuxToDebian12/setup_debian.sh | bash
 ```
 
-## 📋 配置说明
+安装完成后，输入 `debian` 进入 Debian 环境，然后运行上方的 Linux 部署命令。
 
-### 默认端口
+### Windows
+
+```bash
+# 下载并运行（需要 Python 3.10+）
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Windows/install.ps1 | powershell -
+```
+
+或手动运行：
+```powershell
+git clone https://github.com/GamblerIX/DanHeng.git
+cd DanHeng/NDHSM/Windows
+pip install -r requirements.txt
+python main.py
+```
+
+## 📋 默认端口
+
 | 服务 | 端口 | 协议 |
 |------|------|------|
 | HTTP/MUIP | 520 | TCP |
 | GameServer | 23301 | UDP |
 
-### Config.json 关键配置
-```json
-{
-  "HttpServer": {
-    "Port": 520,
-    "UseSSL": true
-  },
-  "GameServer": {
-    "Port": 23301
-  },
-  "MuipServer": {
-    "AdminKey": "服务器启动时自动生成"
-  }
-}
+## 🔧 常用命令
+
+```bash
+# 查看服务控制台
+screen -r danheng
+
+# 分离控制台（不停止服务）
+Ctrl+A+D
+
+# 停止服务
+screen -X -S danheng quit
 ```
 
-## 📚 相关项目
+## 📚 相关链接
 
 - [DanHengServer](https://github.com/GamblerIX/DanHengServer) - 服务端
 - [DanHengProxy](https://github.com/GamblerIX/DanHengProxy) - 代理工具
 - [DanHengServerResources](https://github.com/GamblerIX/DanHengServerResources) - 资源文件
+- [NDHSM](https://github.com/GamblerIX/NDHSM) - 自动化工具
+- [DanHeng](https://github.com/GamblerIX/DanHeng) - 链接上述所有仓库
+- [开发文档](./Docs/) - 项目开发相关文档
 
 ## 📄 许可证
 
-本项目基于 GPL-3.0 许可证开源。
+本项目基于 GNU AGPLv3 许可证开源。

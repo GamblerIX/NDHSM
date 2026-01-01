@@ -491,24 +491,33 @@ configure_firewall() {
     fi
     
     # 检测防火墙类型并配置
+    # 检测防火墙类型并配置
     if command -v ufw &> /dev/null; then
         log_info "检测到 UFW..."
-        ufw allow "$HTTP_PORT"/tcp
-        ufw allow "$GAME_PORT"/udp
-        log_success "UFW 规则已添加"
+        if ufw allow "$HTTP_PORT"/tcp && ufw allow "$GAME_PORT"/udp; then
+            log_success "UFW 规则已添加"
+        else
+            log_warning "UFW 规则添加失败 (可能是环境限制)"
+        fi
         
     elif command -v firewall-cmd &> /dev/null; then
         log_info "检测到 firewalld..."
-        firewall-cmd --permanent --add-port="$HTTP_PORT"/tcp
-        firewall-cmd --permanent --add-port="$GAME_PORT"/udp
-        firewall-cmd --reload
-        log_success "firewalld 规则已添加"
+        if firewall-cmd --permanent --add-port="$HTTP_PORT"/tcp && \
+           firewall-cmd --permanent --add-port="$GAME_PORT"/udp; then
+            firewall-cmd --reload || true
+            log_success "firewalld 规则已添加"
+        else
+            log_warning "firewalld 规则添加失败 (可能是环境限制)"
+        fi
         
     elif command -v iptables &> /dev/null; then
         log_info "使用 iptables..."
-        iptables -A INPUT -p tcp --dport "$HTTP_PORT" -j ACCEPT
-        iptables -A INPUT -p udp --dport "$GAME_PORT" -j ACCEPT
-        log_success "iptables 规则已添加"
+        if iptables -A INPUT -p tcp --dport "$HTTP_PORT" -j ACCEPT && \
+           iptables -A INPUT -p udp --dport "$GAME_PORT" -j ACCEPT; then
+            log_success "iptables 规则已添加"
+        else
+            log_warning "iptables 规则添加失败 (可能是环境限制)"
+        fi
         
     else
         log_warning "未检测到防火墙，跳过配置"

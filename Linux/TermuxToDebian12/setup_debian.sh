@@ -90,12 +90,6 @@ setup_ustc_source() {
         cp "$PREFIX/etc/apt/sources.list" "$PREFIX/etc/apt/sources.list.bak"
     fi
     
-    # 使用 termux-change-repo 或手动替换
-    if command -v termux-change-repo &> /dev/null; then
-        log_info "使用 termux-change-repo 配置..."
-        # termux-change-repo 是交互式的，这里改用手动配置
-    fi
-    
     # 手动写入中科大源
     cat > "$PREFIX/etc/apt/sources.list" << EOF
 # USTC Termux Mirror
