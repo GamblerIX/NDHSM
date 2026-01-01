@@ -33,7 +33,7 @@ INSTALL_DIR="/opt/danheng"
 SERVICE_USER="dh"
 
 # 仓库地址
-GITHUB_SERVER_RELEASES="https://api.github.com/repos/StopWuyu/DanhengServer/releases/latest"
+GITHUB_SERVER_RELEASES="https://api.github.com/repos/GamblerIX/DanHengServer/releases/latest"
 GITEE_SERVER_RELEASES="https://gitee.com/api/v5/repos/GamblerIX/DanHengServer/releases/latest"
 GITHUB_RESOURCES_REPO="https://github.com/GamblerIX/DanHengServerResources.git"
 GITEE_RESOURCES_REPO="https://gitee.com/GamblerIX/DanHengServerResources.git"
