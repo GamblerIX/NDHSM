@@ -329,9 +329,10 @@ download_server() {
     
     log_info "下载地址: $download_url"
     
-    # 下载
+    # 下载 (显示文件名和进度)
     filename=$(basename "$download_url")
-    if wget -q --show-progress -O "$filename" "$download_url"; then
+    log_info "正在下载: $filename"
+    if wget --show-progress -O "$filename" "$download_url"; then
         log_success "下载成功"
     else
         log_error "下载失败"
@@ -356,6 +357,17 @@ download_server() {
     fi
     
     rm -f "$filename"
+    
+    # 将子目录内容移至安装目录根目录
+    # Release 包解压后会创建类似 linux-arm64-self-contained/ 的子目录
+    for subdir in "$INSTALL_DIR"/*-self-contained "$INSTALL_DIR"/*-self-contained/; do
+        if [ -d "$subdir" ]; then
+            log_info "正在整理文件结构..."
+            mv "$subdir"/* "$INSTALL_DIR/" 2>/dev/null || true
+            rmdir "$subdir" 2>/dev/null || true
+        fi
+    done
+    
     log_success "服务器文件准备就绪"
 }
 
@@ -387,13 +399,31 @@ clone_resources() {
 }
 
 # ============================================
-# 步骤 5: 配置 Config.json
+# 步骤 8: 配置 Config.json (服务启动后执行)
 # ============================================
 
 configure_server() {
-    log_step 4 "配置 Config.json..."
+    log_step 8 "配置 Config.json..."
     
-    local config_path="$INSTALL_DIR/config.json"
+    local config_path="$INSTALL_DIR/Config.json"
+    
+    # 等待 Config.json 生成 (服务首次启动会自动创建)
+    log_info "等待配置文件生成..."
+    local wait_count=0
+    while [ ! -f "$config_path" ] && [ $wait_count -lt 30 ]; do
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+    
+    if [ ! -f "$config_path" ]; then
+        log_warning "Config.json 未生成，使用默认配置"
+        return 0
+    fi
+    
+    # 停止服务
+    log_info "停止服务以修改配置..."
+    screen -X -S danheng quit 2>/dev/null || true
+    sleep 2
     
     # 交互模式下询问用户
     if [ "$HEADLESS" = false ]; then
@@ -413,65 +443,45 @@ configure_server() {
         echo ""
     fi
     
-    # 生成配置文件
-    cat > "$config_path" << EOF
-{
-  "HttpServer": {
-    "BindAddress": "0.0.0.0",
-    "PublicAddress": "${PUBLIC_HOST}",
-    "Port": ${HTTP_PORT},
-    "UseSSL": true,
-    "UseFetchRemoteHotfix": false
-  },
-  "KeyStore": {
-    "KeyStorePath": "certificate.p12",
-    "KeyStorePassword": "123456"
-  },
-  "GameServer": {
-    "BindAddress": "0.0.0.0",
-    "PublicAddress": "${PUBLIC_HOST}",
-    "Port": ${GAME_PORT},
-    "GameServerId": "dan_heng",
-    "GameServerName": "DanhengServer",
-    "GameServerDescription": "A re-implementation of StarRail server",
-    "UsePacketEncryption": true
-  },
-  "Path": {
-    "ResourcePath": "Resources",
-    "ConfigPath": "Config",
-    "DatabasePath": "Config/Database",
-    "LogPath": "Logs",
-    "PluginPath": "Plugins"
-  },
-  "Database": {
-    "DatabaseType": "sqlite",
-    "DatabaseName": "danheng.db",
-    "MySqlHost": "127.0.0.1",
-    "MySqlPort": 3306,
-    "MySqlUser": "root",
-    "MySqlPassword": "123456",
-    "MySqlDatabase": "danheng"
-  },
-  "ServerOption": {
-    "StartTrailblazerLevel": 1,
-    "AutoUpgradeWorldLevel": true,
-    "EnableMission": true,
-    "EnableQuest": true,
-    "AutoLightSection": true,
-    "Language": "CHS",
-    "FallbackLanguage": "EN",
-    "DefaultPermissions": ["*"],
-    "AutoCreateUser": true,
-    "FarmingDropRate": 1,
-    "UseCache": false
-  },
-  "MuipServer": {
-    "AdminKey": ""
-  }
-}
-EOF
+    # 使用 jq 修改配置文件
+    if command -v jq &>/dev/null; then
+        local tmp_config=$(mktemp)
+        jq --arg http_port "$HTTP_PORT" \
+           --arg game_port "$GAME_PORT" \
+           --arg public_host "$PUBLIC_HOST" \
+           '.HttpServer.Port = ($http_port | tonumber) |
+            .HttpServer.PublicAddress = $public_host |
+            .GameServer.Port = ($game_port | tonumber) |
+            .GameServer.PublicAddress = $public_host' \
+           "$config_path" > "$tmp_config" && mv "$tmp_config" "$config_path"
+        log_success "配置文件已更新: $config_path"
+    else
+        log_warning "jq 未安装，跳过配置修改 (使用默认值)"
+    fi
     
-    log_success "配置文件已生成: $config_path"
+    # 重新启动服务
+    log_info "重新启动服务..."
+    local server_exe
+    cd "$INSTALL_DIR"
+    if [ -f "DanhengServer" ]; then
+        server_exe="./DanhengServer"
+    elif [ -f "GameServer" ]; then
+        server_exe="./GameServer"
+    else
+        log_error "未找到服务器可执行文件"
+        exit 1
+    fi
+    
+    chmod +x "$server_exe"
+    su - "$SERVICE_USER" -c "cd $INSTALL_DIR && screen -dmS danheng $server_exe"
+    sleep 2
+    
+    if screen -list | grep -q "danheng"; then
+        log_success "服务已重新启动"
+    else
+        log_error "服务重启失败"
+        exit 1
+    fi
 }
 
 # ============================================
@@ -532,16 +542,21 @@ configure_firewall() {
         fi
         
     elif command -v iptables &> /dev/null; then
-        log_info "使用 iptables..."
-        if iptables -A INPUT -p tcp --dport "$HTTP_PORT" -j ACCEPT && \
-           iptables -A INPUT -p udp --dport "$GAME_PORT" -j ACCEPT; then
-            log_success "iptables 规则已添加"
+        # 先测试 iptables 是否可用（Termux 环境可能无权限）
+        if ! iptables -L -n &>/dev/null; then
+            log_info "iptables 不可用 (可能是环境限制)，跳过配置"
         else
-            log_warning "iptables 规则添加失败 (可能是环境限制)"
+            log_info "使用 iptables..."
+            if iptables -A INPUT -p tcp --dport "$HTTP_PORT" -j ACCEPT && \
+               iptables -A INPUT -p udp --dport "$GAME_PORT" -j ACCEPT; then
+                log_success "iptables 规则已添加"
+            else
+                log_warning "iptables 规则添加失败"
+            fi
         fi
         
     else
-        log_warning "未检测到防火墙，跳过配置"
+        log_info "未检测到防火墙工具，跳过配置"
     fi
 }
 
@@ -568,6 +583,8 @@ start_server() {
         exit 1
     fi
     
+    chmod +x "$server_exe"
+    
     # 使用 screen 启动
     log_info "使用 screen 启动服务..."
     
@@ -590,7 +607,7 @@ start_server() {
 # 主流程
 # ============================================
 
-TOTAL_STEPS=7
+TOTAL_STEPS=8
 
 main() {
     echo ""
@@ -610,10 +627,10 @@ main() {
     install_dependencies
     download_server
     clone_resources
-    configure_server
     setup_user
     configure_firewall
     start_server
+    configure_server
     
     echo ""
     echo -e "${GREEN}============================================${NC}"
