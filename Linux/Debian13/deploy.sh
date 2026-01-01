@@ -373,12 +373,11 @@ clone_resources() {
         return 0
     fi
     
-    local repo_url
+    local repo_url="$GITHUB_RESOURCES_REPO"
+    
+    # 资源仓库目前仅支持 GitHub (Gitee 需要鉴权)
     if [ "$USE_GITEE" = true ]; then
-        repo_url="$GITEE_RESOURCES_REPO"
-        log_info "使用 Gitee 镜像..."
-    else
-        repo_url="$GITHUB_RESOURCES_REPO"
+        log_info "注意: 资源文件将从 GitHub 克隆 (Gitee 镜像需鉴权)"
     fi
     
     log_info "正在克隆资源仓库..."
