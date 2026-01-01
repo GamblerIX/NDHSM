@@ -304,10 +304,7 @@ download_server() {
         local url
         url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\")) | .browser_download_url" 2>/dev/null | head -1)
         
-        # 如果架构匹配失败，尝试匹配通用包
-        if [ -z "$url" ] || [ "$url" == "null" ]; then
-            url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"DanhengServer\")) | .browser_download_url" 2>/dev/null | head -1)
-        fi
+
         
         echo "$url"
     }
