@@ -249,7 +249,7 @@ EOF
 # ============================================
 
 install_dependencies() {
-    log_step 2 "安装依赖..."
+    log_step 1 "安装依赖..."
     
     apt-get install -y -qq \
         curl \
@@ -272,7 +272,7 @@ install_dependencies() {
 
 
 download_server() {
-    log_step 3 "下载 DanHengServer..."
+    log_step 2 "下载 DanHengServer..."
     
     local arch=$(detect_arch)
     log_info "检测到架构: $arch"
@@ -364,7 +364,7 @@ download_server() {
 # ============================================
 
 clone_resources() {
-    log_step 4 "克隆资源文件..."
+    log_step 3 "克隆资源文件..."
     
     local resources_dir="$INSTALL_DIR/Resources"
     
@@ -391,7 +391,7 @@ clone_resources() {
 # ============================================
 
 configure_server() {
-    log_step 5 "配置 Config.json..."
+    log_step 4 "配置 Config.json..."
     
     local config_path="$INSTALL_DIR/config.json"
     
@@ -479,7 +479,7 @@ EOF
 # ============================================
 
 setup_user() {
-    log_step 6 "配置用户和权限..."
+    log_step 5 "配置用户和权限..."
     
     # 创建 dh 用户
     if ! id "$SERVICE_USER" &>/dev/null; then
@@ -504,7 +504,7 @@ setup_user() {
 # ============================================
 
 configure_firewall() {
-    log_step 7 "配置防火墙..."
+    log_step 6 "配置防火墙..."
     
     if [ "$SKIP_FIREWALL" = true ]; then
         log_info "跳过防火墙配置"
@@ -550,7 +550,7 @@ configure_firewall() {
 # ============================================
 
 start_server() {
-    log_step 8 "启动服务..."
+    log_step 7 "启动服务..."
     
     cd "$INSTALL_DIR"
     
@@ -590,7 +590,7 @@ start_server() {
 # 主流程
 # ============================================
 
-TOTAL_STEPS=8
+TOTAL_STEPS=7
 
 main() {
     echo ""
@@ -606,7 +606,7 @@ main() {
     check_root
     
     # 执行部署步骤
-    setup_ustc_source
+    # setup_ustc_source
     install_dependencies
     download_server
     clone_resources
