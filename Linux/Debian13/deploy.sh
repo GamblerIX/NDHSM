@@ -34,6 +34,7 @@ SERVICE_USER="dh"
 
 # 仓库地址
 GITHUB_SERVER_RELEASES="https://api.github.com/repos/StopWuyu/DanhengServer/releases/latest"
+GITEE_SERVER_RELEASES="https://gitee.com/api/v5/repos/GamblerIX/DanHengServer/releases/latest"
 GITHUB_RESOURCES_REPO="https://github.com/GamblerIX/DanHengServerResources.git"
 GITEE_RESOURCES_REPO="https://gitee.com/GamblerIX/DanHengServerResources.git"
 
@@ -279,48 +280,90 @@ download_server() {
     mkdir -p "$INSTALL_DIR"
     cd "$INSTALL_DIR"
     
-    # 获取最新 Release
-    log_info "获取最新版本信息..."
+download_server() {
+    log_step 3 "下载 DanHengServer..."
     
-    local release_info
-    if ! release_info=$(curl -sSL "$GITHUB_SERVER_RELEASES" 2>/dev/null); then
-        log_warning "无法访问 GitHub API，尝试备用方案..."
-        # 这里可以添加备用下载逻辑
-        log_error "下载失败，请检查网络连接"
-        exit 1
+    local arch=$(detect_arch)
+    log_info "检测到架构: $arch"
+    
+    cd "$INSTALL_DIR"
+    
+    local download_url=""
+    local filename=""
+    
+    # 辅助函数：尝试从 API 获取下载链接
+    get_download_url() {
+        local api_url="$1"
+        local source_name="$2"
+        
+        log_info "正在尝试从 $source_name 获取版本信息..."
+        
+        local release_info
+        if ! release_info=$(curl -sSL --connect-timeout 10 "$api_url" 2>/dev/null); then
+            log_warning "无法连接到 $source_name API"
+            return 1
+        fi
+        
+        # 尝试匹配架构
+        local url
+        url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\")) | .browser_download_url" | head -1)
+        
+        # 如果架构匹配失败，尝试匹配通用包
+        if [ -z "$url" ] || [ "$url" == "null" ]; then
+            url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"DanhengServer\")) | .browser_download_url" | head -1)
+        fi
+        
+        echo "$url"
+    }
+
+    # 1. 优先尝试 Gitee
+    if [ "$download_url" == "" ] || [ "$download_url" == "null" ]; then
+        download_url=$(get_download_url "$GITEE_SERVER_RELEASES" "Gitee")
+    fi
+
+    # 2. 如果失败，尝试 GitHub
+    if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
+        log_warning "Gitee 获取失败或未找到 Release，尝试 GitHub..."
+        download_url=$(get_download_url "$GITHUB_SERVER_RELEASES" "GitHub")
     fi
     
-    # 查找对应架构的下载链接
-    local download_url
-    download_url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\")) | .browser_download_url" | head -1)
-    
+    # 3. 最终检查
     if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
-        # 尝试通用包
-        download_url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"DanhengServer\")) | .browser_download_url" | head -1)
-    fi
-    
-    if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
-        log_error "未找到适用的下载包"
-        log_info "请手动下载并解压到: $INSTALL_DIR"
+        log_error "未找到适用的下载包 (Gitee 和 GitHub 均失败)"
+        log_info "请手动下载 Release 包并解压到: $INSTALL_DIR"
         exit 1
     fi
     
     log_info "下载地址: $download_url"
     
     # 下载
-    local filename=$(basename "$download_url")
-    wget -q --show-progress -O "$filename" "$download_url"
+    filename=$(basename "$download_url")
+    if wget -q --show-progress -O "$filename" "$download_url"; then
+        log_success "下载成功"
+    else
+        log_error "下载失败"
+        rm -f "$filename"
+        exit 1
+    fi
     
     # 解压
     log_info "正在解压..."
     if [[ $filename == *.zip ]]; then
-        unzip -o -q "$filename"
+        if ! unzip -o -q "$filename"; then
+            log_error "解压失败 (unzip)"
+            exit 1
+        fi
     elif [[ $filename == *.tar.gz ]]; then
-        tar -xzf "$filename"
+        if ! tar -xzf "$filename"; then
+             log_error "解压失败 (tar)"
+             exit 1
+        fi
+    else
+        log_warning "未知的压缩格式，尝试保留文件"
     fi
     
     rm -f "$filename"
-    log_success "服务器下载完成"
+    log_success "服务器文件准备就绪"
 }
 
 # ============================================
