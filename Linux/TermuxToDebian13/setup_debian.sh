@@ -1,20 +1,20 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ============================================
-# NDHSM Termux 转 Debian 12 脚本
-# 相关文件: ../Debian12/deploy.sh
+# NDHSM Termux 转 Debian 13 脚本
+# 相关文件: ../Debian13/deploy.sh
 # ============================================
 #
 # 功能说明:
 # 1. 设置中科大源
 # 2. 安装 proot-distro
-# 3. 安装 Debian 12
+# 3. 安装 Debian 13
 # 4. 添加 "debian" 快捷命令
 #
 # 使用方法:
 #   bash setup_debian.sh
 #
 # 安装完成后:
-#   输入 "debian" 即可启动 Debian 12 环境
+#   输入 "debian" 即可启动 Debian 13 环境
 #
 # ============================================
 
@@ -128,11 +128,11 @@ install_proot_distro() {
 }
 
 # ============================================
-# 步骤 3: 安装 Debian 12
+# 步骤 3: 安装 Debian 13
 # ============================================
 
 install_debian() {
-    log_step 3 "安装 Debian 12..."
+    log_step 3 "安装 Debian 13..."
     
     # 检查是否已安装（检测 rootfs 目录）
     local rootfs_dir="$PREFIX/var/lib/proot-distro/installed-rootfs/debian"
@@ -141,7 +141,7 @@ install_debian() {
         return 0
     fi
     
-    log_info "正在下载并安装 Debian 12，请耐心等待..."
+    log_info "正在下载并安装 Debian 13，请耐心等待..."
     
     # 安装 Debian
     proot-distro install "$DEBIAN_DISTRO"
@@ -181,7 +181,7 @@ setup_shortcut() {
     # 创建快捷脚本
     cat > "$shortcut_path" << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
-# DanHeng Debian 12 快捷启动脚本
+# DanHeng Debian 13 快捷启动脚本
 # 使用方法: debian [命令]
 
 if [ $# -eq 0 ]; then
@@ -197,7 +197,7 @@ EOF
     chmod +x "$shortcut_path"
     
     log_success "快捷命令 '$SHORTCUT_NAME' 已创建"
-    log_info "输入 '$SHORTCUT_NAME' 即可启动 Debian 12"
+    log_info "输入 '$SHORTCUT_NAME' 即可启动 Debian 13"
 }
 
 # ============================================
@@ -207,7 +207,7 @@ EOF
 main() {
     echo ""
     echo -e "${CYAN}============================================${NC}"
-    echo -e "${CYAN}  NDHSM Termux 转 Debian 12 脚本${NC}"
+    echo -e "${CYAN}  NDHSM Termux 转 Debian 13 脚本${NC}"
     echo -e "${CYAN}============================================${NC}"
     echo ""
     

@@ -13,9 +13,9 @@ NDHSM/
 │   ├── proxy_manager.py       # 代理管理
 │   └── requirements.txt       # Python 依赖
 ├── Linux/
-│   ├── Debian12/
-│   │   └── deploy.sh          # Debian 12 全自动部署脚本
-│   └── TermuxToDebian12/
+│   ├── Debian13/
+│   │   └── deploy.sh          # Debian 13 全自动部署脚本
+│   └── TermuxToDebian13/
 │       └── setup_debian.sh    # Termux 安装 Debian 脚本
 └── Docs/
     ├── requirements.md        # 需求文档
@@ -70,7 +70,7 @@ NDHSM/
 
 1. 配置中科大 Termux 源
 2. 安装 proot-distro
-3. 安装 Debian 12
+3. 安装 Debian 13
 4. 配置 Debian 中科大源
 5. 创建 `debian` 快捷命令
 

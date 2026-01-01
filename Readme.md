@@ -4,14 +4,14 @@
 
 ## 🚀 一键部署
 
-### Linux Debian 12
+### Linux Debian 13
 
 ```bash
 # GitHub 源
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian12/deploy.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | sudo bash
 
 # Gitee 源（国内推荐）
-curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian12/deploy.sh | sudo bash
+curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | sudo bash
 ```
 
 **无头模式（跳过交互）：**
@@ -23,10 +23,10 @@ curl -sSL <脚本地址> | sudo bash -s -- --headless --gitee
 
 ```bash
 # GitHub 源
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/TermuxToDebian12/setup_debian.sh | bash
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/TermuxToDebian13/setup_debian.sh | bash
 
 # Gitee 源（国内推荐）
-curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/TermuxToDebian12/setup_debian.sh | bash
+curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/TermuxToDebian13/setup_debian.sh | bash
 ```
 
 安装完成后，输入 `debian` 进入 Debian 环境，然后运行上方的 Linux 部署命令。

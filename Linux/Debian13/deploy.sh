@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
-# NDHSM Linux Debian 12 全自动部署脚本
-# 相关文件: ../TermuxToDebian12/setup_debian.sh
+# NDHSM Linux Debian 13 全自动部署脚本
+# 相关文件: ../TermuxToDebian13/setup_debian.sh
 # ============================================
 #
 # 功能说明:
@@ -172,7 +172,7 @@ parse_args() {
 
 show_help() {
     cat << EOF
-NDHSM Linux Debian 12 全自动部署脚本
+NDHSM Linux Debian 13 全自动部署脚本
 
 用法: bash deploy.sh [选项]
 
@@ -571,7 +571,7 @@ TOTAL_STEPS=9
 main() {
     echo ""
     echo -e "${CYAN}============================================${NC}"
-    echo -e "${CYAN}  NDHSM Linux Debian 12 自动部署脚本${NC}"
+    echo -e "${CYAN}  NDHSM Linux Debian 13 自动部署脚本${NC}"
     echo -e "${CYAN}============================================${NC}"
     echo ""
     

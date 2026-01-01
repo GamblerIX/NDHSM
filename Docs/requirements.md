@@ -6,7 +6,7 @@
 2. **指令器开发**：通过连接 127.0.0.1:520 端口，并读取 Config.json 中存储的 DanHengServer 管理密钥，基于 PySide6 Fluent 框架开发美观易用的 GUI 页面，支持在页面内执行相关命令。
 3. **Proxy 调用**：调用 DanHengProxy 并启用无头模式与静默模式，实现客户端请求的重定向功能。
 
-# 二、Linux Debian 12 端全自动脚本需求
+# 二、Linux Debian 13 端全自动脚本需求
 
 1. 自动安装或更新所需运行环境（设置中科大源），从 Gitee(同步自Github) 或 GitHub 自动匹配硬件架构，下载 Releases 中的最新版本压缩包，并完成自动解压部署。
 2. 将 DanHengServerResources 资源文件克隆至 DanHengServer 目录下，并重命名为 Resources。
@@ -18,11 +18,11 @@
 
 - 补充说明：脚本需额外支持命令行参数无头调用模式，无需人工交互即可完成全流程部署与程序启动运行。
 
-# 三、Termux 转 Debian 12 全自动脚本需求
+# 三、Termux 转 Debian 13 全自动脚本需求
 
 1. 设置中科大源。安装 proot-distro 工具。
-1. 通过 proot-distro 工具自动安装 Debian 12 系统。
-2. 添加快捷启动指令“debian”，输入该指令即可一键启动 Debian 12 系统。
+1. 通过 proot-distro 工具自动安装 Debian 13 系统。
+2. 添加快捷启动指令“debian”，输入该指令即可一键启动 Debian 13 系统。
 
 https://github/GamblerIX/DanHeng.git
 https://gitee/GamblerIX/DanHeng.git（未完成开发，暂未推送。我会手动同步。）
