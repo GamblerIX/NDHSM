@@ -540,7 +540,8 @@ setup_user() {
         chmod +x "$INSTALL_DIR/DanhengServer"
         log_success "权限配置完成"
     else
-        log_warning "DanhengServer 不存在，跳过权限设置"
+        log_error "DanhengServer 不存在，部署失败"
+        exit 1
     fi
 }
 
