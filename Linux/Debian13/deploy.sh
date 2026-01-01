@@ -599,18 +599,22 @@ start_server() {
     # 使用 screen 启动
     log_info "使用 screen 启动服务..."
     
-    # 检测是否在 Termux proot 环境
-    if [ -f /etc/proot-distro ] || { [ "$EUID" -eq 0 ] && ! command -v sudo &>/dev/null; }; then
-        # Termux 环境：设置 .NET GC 环境变量解决内存限制问题，直接以当前用户启动
-        log_info "检测到 Termux proot 环境，启用 GC 内存限制"
-        export DOTNET_GCHeapHardLimit=200000000
-        export DOTNET_EnableDiagnostics=0
-        export DOTNET_gcServer=0
-        screen -dmS danheng "$server_exe"
-    else
-        # 标准 Linux 环境：以服务用户启动
-        su - "$SERVICE_USER" -c "cd $INSTALL_DIR && screen -dmS danheng $server_exe"
+    # 动态计算 GC 堆限制 (可用内存的 50%，最小 128MB，最大 2GB)
+    local available_mem_kb=$(grep MemAvailable /proc/meminfo 2>/dev/null | awk '{print $2}')
+    if [ -z "$available_mem_kb" ]; then
+        available_mem_kb=$(free | awk '/^Mem:/{print $7}')
     fi
+    local gc_limit=$((available_mem_kb * 1024 / 2))  # 50% of available memory in bytes
+    [ "$gc_limit" -lt 134217728 ] && gc_limit=134217728    # 最小 128MB
+    [ "$gc_limit" -gt 2147483648 ] && gc_limit=2147483648  # 最大 2GB
+    
+    log_info "可用内存: $((available_mem_kb / 1024))MB, GC 限制: $((gc_limit / 1048576))MB"
+    
+    export DOTNET_GCHeapHardLimit=$gc_limit
+    export DOTNET_EnableDiagnostics=0
+    export DOTNET_gcServer=0
+    
+    screen -dmS danheng "$server_exe"
     
     sleep 3
     
