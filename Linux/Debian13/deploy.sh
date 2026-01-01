@@ -428,6 +428,10 @@ configure_server() {
     
     # 等待 Config.json 生成 (服务首次启动会自动创建)
     log_info "等待配置文件生成..."
+    mkdir -p "$INSTALL_DIR/Config"
+    chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR/Config"
+    mkdir -p "$INSTALL_DIR/Config"
+    chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR/Config"
     local wait_count=0
     while [ ! -f "$config_path" ] && [ $wait_count -lt 30 ]; do
         sleep 1
@@ -492,6 +496,7 @@ configure_server() {
     fi
     
     chmod +x "$server_exe"
+    chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
     su - "$SERVICE_USER" -c "cd $INSTALL_DIR && screen -dmS danheng $server_exe"
     sleep 2
     
@@ -520,6 +525,15 @@ setup_user() {
     else
         log_info "用户 $SERVICE_USER 已存在"
     fi
+    
+    # 预创建必要目录
+    log_info "正在预创建必要目录..."
+    mkdir -p "$INSTALL_DIR/Config/Database"
+    mkdir -p "$INSTALL_DIR/Logs"
+    mkdir -p "$INSTALL_DIR/Plugins"
+    
+    # 设置目录所有权
+    chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
     
     # 仅设置 DanhengServer 可执行权限
     if [ -f "$INSTALL_DIR/DanhengServer" ]; then
