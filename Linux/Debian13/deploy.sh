@@ -126,6 +126,7 @@ GAME_PORT=$DEFAULT_GAME_PORT
 PUBLIC_HOST=$DEFAULT_HOST
 SKIP_FIREWALL=false
 CONFIG_FILE=""
+GC_LIMIT=""  # 空表示自动检测
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -158,6 +159,10 @@ parse_args() {
                 CONFIG_FILE="$2"
                 shift 2
                 ;;
+            --gc-limit)
+                GC_LIMIT="$2"
+                shift 2
+                ;;
             --help|-h)
                 show_help
                 exit 0
@@ -184,6 +189,7 @@ NDHSM Linux Debian 13 全自动部署脚本
   --game-port PORT    游戏服务器端口（默认: $DEFAULT_GAME_PORT）
   --host HOST         公网地址（默认: $DEFAULT_HOST）
   --skip-firewall     跳过防火墙配置
+  --gc-limit MB       手动设置 GC 内存限制 (单位 MB，默认自动检测)
   --config FILE       从配置文件读取参数
   --help, -h          显示帮助信息
 
@@ -599,16 +605,23 @@ start_server() {
     # 使用 screen 启动
     log_info "使用 screen 启动服务..."
     
-    # 动态计算 GC 堆限制 (可用内存的 50%，最小 128MB，最大 2GB)
-    local available_mem_kb=$(grep MemAvailable /proc/meminfo 2>/dev/null | awk '{print $2}')
-    if [ -z "$available_mem_kb" ]; then
-        available_mem_kb=$(free | awk '/^Mem:/{print $7}')
+    # 计算 GC 堆限制
+    local gc_limit
+    if [ -n "$GC_LIMIT" ]; then
+        # 用户手动指定 (单位 MB，转换为字节)
+        gc_limit=$((GC_LIMIT * 1048576))
+        log_info "GC 限制 (手动): ${GC_LIMIT}MB"
+    else
+        # 自动检测 (可用内存的 50%，最小 128MB，最大 2GB)
+        local available_mem_kb=$(grep MemAvailable /proc/meminfo 2>/dev/null | awk '{print $2}')
+        if [ -z "$available_mem_kb" ]; then
+            available_mem_kb=$(free | awk '/^Mem:/{print $7}')
+        fi
+        gc_limit=$((available_mem_kb * 1024 / 2))
+        [ "$gc_limit" -lt 134217728 ] && gc_limit=134217728    # 最小 128MB
+        [ "$gc_limit" -gt 2147483648 ] && gc_limit=2147483648  # 最大 2GB
+        log_info "可用内存: $((available_mem_kb / 1024))MB, GC 限制: $((gc_limit / 1048576))MB"
     fi
-    local gc_limit=$((available_mem_kb * 1024 / 2))  # 50% of available memory in bytes
-    [ "$gc_limit" -lt 134217728 ] && gc_limit=134217728    # 最小 128MB
-    [ "$gc_limit" -gt 2147483648 ] && gc_limit=2147483648  # 最大 2GB
-    
-    log_info "可用内存: $((available_mem_kb / 1024))MB, GC 限制: $((gc_limit / 1048576))MB"
     
     export DOTNET_GCHeapHardLimit=$gc_limit
     export DOTNET_EnableDiagnostics=0
