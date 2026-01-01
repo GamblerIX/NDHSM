@@ -8,15 +8,15 @@
 
 ```bash
 # GitHub 源
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash
 
 # Gitee 源（国内推荐）
-curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | sudo bash
+curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | bash
 ```
 
 **无头模式（跳过交互）：**
 ```bash
-curl -sSL <脚本地址> | sudo bash -s -- --headless --gitee
+curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless --gitee
 ```
 
 ### Termux (Android)
@@ -33,13 +33,15 @@ curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/TermuxToDebia
 
 ### Windows
 
+> 需要 Python 3.10+。
+
 ```bash
-# 下载并运行（需要 Python 3.10+）
+# 远程下载并运行
 curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Windows/install.ps1 | powershell -
 ```
 
-或手动运行：
-```powershell
+```bash
+# 手动运行
 git clone https://github.com/GamblerIX/DanHeng.git
 cd DanHeng/NDHSM/Windows
 pip install -r requirements.txt

@@ -188,13 +188,13 @@ NDHSM Linux Debian 13 全自动部署脚本
 
 示例:
   # 交互模式
-  sudo bash deploy.sh
+  bash deploy.sh
 
   # 无头模式
-  sudo bash deploy.sh --headless --http-port 443 --game-port 23301
+  bash deploy.sh --headless --http-port 443 --game-port 23301
 
   # 使用 Gitee 镜像
-  sudo bash deploy.sh --headless --gitee
+  bash deploy.sh --headless --gitee
 EOF
 }
 
