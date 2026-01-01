@@ -329,9 +329,8 @@ download_server() {
     
     log_info "下载地址: $download_url"
     
-    # 下载 (显示文件名和进度)
+    # 下载
     filename=$(basename "$download_url")
-    log_info "正在下载: $filename"
     if wget --show-progress -O "$filename" "$download_url"; then
         log_success "下载成功"
     else
@@ -356,7 +355,8 @@ download_server() {
         log_warning "未知的压缩格式，尝试保留文件"
     fi
     
-    rm -f "$filename"
+    # 保留压缩包，待服务成功启动后删除
+    # rm -f "$filename" 已移至 configure_server 函数末尾
     
     # 将子目录内容移至安装目录根目录
     # Release 包解压后会创建类似 linux-arm64-self-contained/ 的子目录
@@ -478,6 +478,9 @@ configure_server() {
     
     if screen -list | grep -q "danheng"; then
         log_success "服务已重新启动"
+        
+        # 清理下载的压缩包
+        rm -f "$INSTALL_DIR"/*.zip "$INSTALL_DIR"/*.tar.gz 2>/dev/null || true
     else
         log_error "服务重启失败"
         exit 1
@@ -499,12 +502,16 @@ setup_user() {
         log_info "用户 $SERVICE_USER 已存在"
     fi
     
-    # 设置目录权限
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
-    chmod -R 755 "$INSTALL_DIR"
+    # 检查并修复目录权限 (仅在权限不正确时才修改)
+    local current_owner=$(stat -c '%U' "$INSTALL_DIR" 2>/dev/null)
+    if [ "$current_owner" != "$SERVICE_USER" ]; then
+        log_info "设置目录权限..."
+        chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
+        chmod -R 755 "$INSTALL_DIR"
+    fi
     
     # 设置可执行权限
-    find "$INSTALL_DIR" -name "*.exe" -o -name "GameServer" | xargs chmod +x 2>/dev/null || true
+    find "$INSTALL_DIR" -name "DanhengServer" -o -name "GameServer" | xargs chmod +x 2>/dev/null || true
     
     log_success "权限配置完成"
 }
