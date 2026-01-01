@@ -21,7 +21,7 @@ curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/depl
 
 **手动设置 GC 内存限制（Termux 推荐）：**
 ```bash
-curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless --gitee --gc-limit 512
+curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless --gitee --gc-limit 128
 ```
 
 ### Termux (Android)
