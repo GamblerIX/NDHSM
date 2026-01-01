@@ -26,7 +26,7 @@ set -e
 # ============================================
 
 # 默认配置
-DEFAULT_HTTP_PORT=520
+DEFAULT_HTTP_PORT=23300
 DEFAULT_GAME_PORT=23301
 DEFAULT_HOST="0.0.0.0"
 INSTALL_DIR="/opt/danheng"
