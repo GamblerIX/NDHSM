@@ -210,13 +210,34 @@ setup_ustc_source() {
         cp /etc/apt/sources.list /etc/apt/sources.list.bak
     fi
     
+    # 获取当前版本代号（默认 bookworm）
+    local codename="bookworm"
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [ -n "$VERSION_CODENAME" ]; then
+            codename="$VERSION_CODENAME"
+        fi
+    fi
+    log_info "检测到 Debian 版本: $codename"
+
     # 写入中科大源
-    cat > /etc/apt/sources.list << EOF
-deb ${USTC_APT_SOURCE} bookworm main contrib non-free non-free-firmware
-deb ${USTC_APT_SOURCE} bookworm-updates main contrib non-free non-free-firmware
-deb ${USTC_APT_SOURCE} bookworm-backports main contrib non-free non-free-firmware
-deb ${USTC_APT_SOURCE}-security bookworm-security main contrib non-free non-free-firmware
+    # 注意：trixie (testing) 安全源 URL 可能不同，这里统一处理通用格式
+    if [ "$codename" == "trixie" ] || [ "$codename" == "sid" ]; then
+        # Testing/Sid 版本
+        cat > /etc/apt/sources.list << EOF
+deb ${USTC_APT_SOURCE} $codename main contrib non-free non-free-firmware
+deb ${USTC_APT_SOURCE} ${codename}-updates main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian-security ${codename}-security main contrib non-free non-free-firmware
 EOF
+    else
+        # Stable (bookworm) 及旧版本
+        cat > /etc/apt/sources.list << EOF
+deb ${USTC_APT_SOURCE} $codename main contrib non-free non-free-firmware
+deb ${USTC_APT_SOURCE} ${codename}-updates main contrib non-free non-free-firmware
+deb ${USTC_APT_SOURCE} ${codename}-backports main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian-security ${codename}-security main contrib non-free non-free-firmware
+EOF
+    fi
     
     apt-get update -qq
     log_success "中科大源配置完成"
