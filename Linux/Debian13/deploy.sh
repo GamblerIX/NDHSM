@@ -263,49 +263,14 @@ install_dependencies() {
     log_success "依赖安装完成"
 }
 
-# ============================================
-# 步骤 3: 安装 .NET 9.0
-# ============================================
 
-install_dotnet() {
-    log_step 3 "安装 .NET 9.0..."
-    
-    # 检查是否已安装
-    if command -v dotnet &> /dev/null; then
-        local version=$(dotnet --version 2>/dev/null || echo "unknown")
-        if [[ $version == 9.* ]]; then
-            log_info ".NET 9.0 已安装 (版本: $version)"
-            return 0
-        fi
-    fi
-    
-    # 使用微软官方安装脚本
-    log_info "正在下载 .NET 安装脚本..."
-    curl -sSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
-    chmod +x /tmp/dotnet-install.sh
-    
-    # 安装 .NET 9.0 运行时
-    log_info "正在安装 .NET 9.0 运行时..."
-    /tmp/dotnet-install.sh --channel 9.0 --runtime dotnet --install-dir /usr/share/dotnet
-    
-    # 创建符号链接
-    ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
-    
-    # 验证安装
-    if dotnet --info &> /dev/null; then
-        log_success ".NET 9.0 安装完成"
-    else
-        log_error ".NET 安装失败"
-        exit 1
-    fi
-}
 
 # ============================================
 # 步骤 4: 下载服务器
 # ============================================
 
 download_server() {
-    log_step 4 "下载 DanHengServer..."
+    log_step 3 "下载 DanHengServer..."
     
     local arch=$(detect_arch)
     log_info "检测到架构: $arch"
@@ -363,7 +328,7 @@ download_server() {
 # ============================================
 
 clone_resources() {
-    log_step 5 "克隆资源文件..."
+    log_step 4 "克隆资源文件..."
     
     local resources_dir="$INSTALL_DIR/Resources"
     
@@ -391,7 +356,7 @@ clone_resources() {
 # ============================================
 
 configure_server() {
-    log_step 6 "配置 Config.json..."
+    log_step 5 "配置 Config.json..."
     
     local config_path="$INSTALL_DIR/config.json"
     
@@ -479,7 +444,7 @@ EOF
 # ============================================
 
 setup_user() {
-    log_step 7 "配置用户和权限..."
+    log_step 6 "配置用户和权限..."
     
     # 创建 dh 用户
     if ! id "$SERVICE_USER" &>/dev/null; then
@@ -504,7 +469,7 @@ setup_user() {
 # ============================================
 
 configure_firewall() {
-    log_step 8 "配置防火墙..."
+    log_step 7 "配置防火墙..."
     
     if [ "$SKIP_FIREWALL" = true ]; then
         log_info "跳过防火墙配置"
@@ -550,18 +515,22 @@ configure_firewall() {
 # ============================================
 
 start_server() {
-    log_step 9 "启动服务..."
+    log_step 8 "启动服务..."
     
     cd "$INSTALL_DIR"
     
     # 查找可执行文件
+    # 查找可执行文件
     local server_exe
-    if [ -f "GameServer" ]; then
+    if [ -f "DanhengServer" ]; then
+        server_exe="./DanhengServer"
+    elif [ -f "GameServer" ]; then
         server_exe="./GameServer"
     elif [ -f "GameServer.exe" ]; then
-        server_exe="dotnet GameServer.exe"
+        # 兼容 Windows 编译的 Linux 包（有时会保留 .exe 后缀但在 Linux 可直接运行）
+        server_exe="./GameServer.exe"
     else
-        log_error "未找到服务器可执行文件"
+        log_error "未找到服务器可执行文件 (DanhengServer/GameServer)"
         exit 1
     fi
     
@@ -587,7 +556,7 @@ start_server() {
 # 主流程
 # ============================================
 
-TOTAL_STEPS=9
+TOTAL_STEPS=8
 
 main() {
     echo ""
@@ -605,7 +574,6 @@ main() {
     # 执行部署步骤
     setup_ustc_source
     install_dependencies
-    install_dotnet
     download_server
     clone_resources
     configure_server

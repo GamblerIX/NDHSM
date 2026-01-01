@@ -45,13 +45,12 @@ NDHSM/
 
 1. **配置中科大 APT 源** - 加速包下载
 2. **安装依赖** - curl, wget, git, screen, jq
-3. **安装 .NET 9.0** - 服务端运行环境
-4. **下载服务器** - 从 GitHub Releases 获取最新版本
-5. **克隆资源文件** - DanHengServerResources
-6. **配置 Config.json** - 交互式或无头模式
-7. **创建 dh 用户** - 权限隔离
-8. **配置防火墙** - 开放服务端口
-9. **启动服务** - screen 后台运行
+3. **下载服务器** - 从 GitHub Releases 获取最新版本
+4. **克隆资源文件** - DanHengServerResources
+5. **配置 Config.json** - 交互式或无头模式
+6. **创建 dh 用户** - 权限隔离
+7. **配置防火墙** - 开放服务端口
+8. **启动服务** - screen 后台运行
 
 ### 命令行参数
 
