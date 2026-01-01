@@ -517,7 +517,7 @@ setup_user() {
     # 检查并修复目录权限 (仅在权限不正确时才修改)
     local current_owner=$(stat -c '%U' "$INSTALL_DIR" 2>/dev/null)
     if [ "$current_owner" != "$SERVICE_USER" ]; then
-        log_info "设置目录权限..."
+        log_info "设置目录权限 (此操作可能需要较长时间)..."
         chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
         chmod -R 755 "$INSTALL_DIR"
     fi
