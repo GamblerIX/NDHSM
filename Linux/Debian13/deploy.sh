@@ -591,24 +591,29 @@ start_server() {
     local server_exe
     if [ -f "DanhengServer" ]; then
         server_exe="./DanhengServer"
-    elif [ -f "GameServer" ]; then
-        server_exe="./GameServer"
-    elif [ -f "GameServer.exe" ]; then
-        # 兼容 Windows 编译的 Linux 包（有时会保留 .exe 后缀但在 Linux 可直接运行）
-        server_exe="./GameServer.exe"
     else
-        log_error "未找到服务器可执行文件 (DanhengServer/GameServer)"
+        log_error "未找到服务器可执行文件 (DanhengServer)"
+        log_info "安装目录内容:"
+        ls -la "$INSTALL_DIR" | head -20
         exit 1
     fi
     
     chmod +x "$server_exe"
+    log_info "可执行文件: $server_exe"
     
     # 使用 screen 启动
     log_info "使用 screen 启动服务..."
     
-    su - "$SERVICE_USER" -c "cd $INSTALL_DIR && screen -dmS danheng $server_exe"
+    # 检测是否在 Termux proot 环境 (用户切换可能失败)
+    if [ -f /etc/proot-distro ] || [ "$EUID" -eq 0 ] && ! command -v sudo &>/dev/null; then
+        # Termux 环境：直接以当前用户启动
+        screen -dmS danheng "$server_exe"
+    else
+        # 标准 Linux 环境：以服务用户启动
+        su - "$SERVICE_USER" -c "cd $INSTALL_DIR && screen -dmS danheng $server_exe"
+    fi
     
-    sleep 2
+    sleep 3
     
     # 检查是否启动成功
     if screen -list | grep -q "danheng"; then
@@ -617,6 +622,8 @@ start_server() {
         log_info "使用 Ctrl+A+D 分离控制台"
     else
         log_error "服务启动失败"
+        log_info "尝试手动启动以查看错误信息:"
+        log_info "  cd $INSTALL_DIR && $server_exe"
         exit 1
     fi
 }
