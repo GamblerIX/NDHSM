@@ -270,16 +270,7 @@ install_dependencies() {
 # 步骤 4: 下载服务器
 # ============================================
 
-download_server() {
-    log_step 3 "下载 DanHengServer..."
-    
-    local arch=$(detect_arch)
-    log_info "检测到架构: $arch"
-    
-    # 创建安装目录
-    mkdir -p "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
-    
+
 download_server() {
     log_step 3 "下载 DanHengServer..."
     
@@ -562,7 +553,6 @@ start_server() {
     
     cd "$INSTALL_DIR"
     
-    # 查找可执行文件
     # 查找可执行文件
     local server_exe
     if [ -f "DanhengServer" ]; then
