@@ -268,7 +268,8 @@ install_dependencies() {
         screen \
         jq \
         ca-certificates \
-        apt-transport-https
+        apt-transport-https \
+        libicu-dev
     
     log_success "依赖安装完成"
 }
@@ -624,8 +625,13 @@ start_server() {
     fi
     
     export DOTNET_GCHeapHardLimit=$gc_limit
+    export DOTNET_GC_HEAP_LIMIT=$gc_limit # 兼容性设置
     export DOTNET_EnableDiagnostics=0
     export DOTNET_gcServer=0
+    export DOTNET_EnableGCServer=0 # 兼容性别名
+    export DOTNET_TieredCompilation=0
+    export DOTNET_HeapAllocRateLimit=1
+    export DOTNET_GCConcurrent=1
     
     screen -dmS danheng "$server_exe"
     
