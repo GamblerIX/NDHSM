@@ -300,9 +300,9 @@ download_server() {
              return 1
         fi
         
-        # 尝试匹配架构
+        # 尝试匹配架构 (仅下载 self-contained 版本)
         local url
-        url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\")) | .browser_download_url" 2>/dev/null | head -1)
+        url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\") and contains(\"self-contained\")) | .browser_download_url" 2>/dev/null | head -1)
         
 
         
