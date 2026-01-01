@@ -267,7 +267,7 @@ install_dependencies() {
 
 
 # ============================================
-# 步骤 4: 下载服务器
+# 步骤 3: 下载服务器
 # ============================================
 
 
@@ -287,21 +287,26 @@ download_server() {
         local api_url="$1"
         local source_name="$2"
         
-        log_info "正在尝试从 $source_name 获取版本信息..."
+        log_info "正在尝试从 $source_name 获取版本信息..." >&2
         
         local release_info
         if ! release_info=$(curl -sSL --connect-timeout 10 "$api_url" 2>/dev/null); then
-            log_warning "无法连接到 $source_name API"
+            log_warning "无法连接到 $source_name API" >&2
             return 1
+        fi
+
+        if [ -z "$release_info" ]; then
+             log_warning "$source_name API 返回为空" >&2
+             return 1
         fi
         
         # 尝试匹配架构
         local url
-        url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\")) | .browser_download_url" | head -1)
+        url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\")) | .browser_download_url" 2>/dev/null | head -1)
         
         # 如果架构匹配失败，尝试匹配通用包
         if [ -z "$url" ] || [ "$url" == "null" ]; then
-            url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"DanhengServer\")) | .browser_download_url" | head -1)
+            url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"DanhengServer\")) | .browser_download_url" 2>/dev/null | head -1)
         fi
         
         echo "$url"
@@ -358,7 +363,7 @@ download_server() {
 }
 
 # ============================================
-# 步骤 5: 克隆资源文件
+# 步骤 4: 克隆资源文件
 # ============================================
 
 clone_resources() {
@@ -386,7 +391,7 @@ clone_resources() {
 }
 
 # ============================================
-# 步骤 6: 配置 Config.json
+# 步骤 5: 配置 Config.json
 # ============================================
 
 configure_server() {
@@ -474,7 +479,7 @@ EOF
 }
 
 # ============================================
-# 步骤 7: 创建用户和权限
+# 步骤 6: 创建用户和权限
 # ============================================
 
 setup_user() {
@@ -499,7 +504,7 @@ setup_user() {
 }
 
 # ============================================
-# 步骤 8: 配置防火墙
+# 步骤 7: 配置防火墙
 # ============================================
 
 configure_firewall() {
@@ -545,7 +550,7 @@ configure_firewall() {
 }
 
 # ============================================
-# 步骤 9: 启动服务
+# 步骤 8: 启动服务
 # ============================================
 
 start_server() {
