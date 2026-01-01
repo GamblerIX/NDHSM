@@ -251,6 +251,9 @@ EOF
 install_dependencies() {
     log_step 1 "安装依赖..."
     
+    # 更新包列表
+    apt-get update -qq
+    
     apt-get install -y -qq \
         curl \
         wget \
@@ -267,12 +270,21 @@ install_dependencies() {
 
 
 # ============================================
-# 步骤 3: 下载服务器
+# 步骤 2: 下载服务器 (已存在则跳过)
 # ============================================
 
 
 download_server() {
     log_step 2 "下载 DanHengServer..."
+    
+    # 检测可执行文件是否已存在
+    if [ -f "$INSTALL_DIR/DanhengServer" ] || [ -f "$INSTALL_DIR/GameServer" ]; then
+        log_info "服务器文件已存在，跳过下载"
+        return 0
+    fi
+    
+    # 创建安装目录
+    mkdir -p "$INSTALL_DIR"
     
     local arch=$(detect_arch)
     log_info "检测到架构: $arch"
