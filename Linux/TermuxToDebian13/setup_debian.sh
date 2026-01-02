@@ -1,14 +1,13 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ============================================
 # NDHSM Termux 转 Debian 13 脚本
-# 相关文件: ../Debian13/deploy.sh
+# 相关文件: ../DeployOnDebian13/deploy.sh
 # ============================================
 #
 # 功能说明:
-# 1. 设置中科大源
-# 2. 安装 proot-distro
-# 3. 安装 Debian 13
-# 4. 添加 "debian" 快捷命令
+# 1. 安装 proot-distro
+# 2. 安装 Debian 13
+# 3. 添加 "debian" 快捷命令
 #
 # 使用方法:
 #   bash setup_debian.sh
@@ -23,9 +22,6 @@ set -e
 # ============================================
 # 配置变量（便于修改）
 # ============================================
-
-# 中科大 Termux 镜像
-USTC_TERMUX_REPO="https://mirrors.ustc.edu.cn/termux/apt/termux-main"
 
 # Debian 发行版代号
 DEBIAN_DISTRO="debian"
@@ -62,7 +58,7 @@ log_error() {
 }
 
 log_step() {
-    echo -e "${CYAN}[STEP $1/4]${NC} $2"
+    echo -e "${CYAN}[STEP $1/3]${NC} $2"
 }
 
 check_termux() {
@@ -73,42 +69,11 @@ check_termux() {
 }
 
 # ============================================
-# 步骤 1: 设置中科大源
-# ============================================
-
-setup_ustc_source() {
-    log_step 1 "配置中科大 Termux 源..."
-    
-    # 检查是否已配置
-    if grep -q "mirrors.ustc.edu.cn" "$PREFIX/etc/apt/sources.list" 2>/dev/null; then
-        log_info "中科大源已配置，跳过"
-        return 0
-    fi
-    
-    # 备份原有源
-    if [ -f "$PREFIX/etc/apt/sources.list" ]; then
-        cp "$PREFIX/etc/apt/sources.list" "$PREFIX/etc/apt/sources.list.bak"
-    fi
-    
-    # 手动写入中科大源
-    cat > "$PREFIX/etc/apt/sources.list" << EOF
-# USTC Termux Mirror
-deb ${USTC_TERMUX_REPO} stable main
-EOF
-    
-    # 更新包列表
-    log_info "更新包列表..."
-    apt-get update -qq
-    
-    log_success "中科大源配置完成"
-}
-
-# ============================================
-# 步骤 2: 安装 proot-distro
+# 步骤 1: 安装 proot-distro
 # ============================================
 
 install_proot_distro() {
-    log_step 2 "安装 proot-distro..."
+    log_step 1 "安装 proot-distro..."
     
     # 检查是否已安装
     if command -v proot-distro &> /dev/null; then
@@ -116,8 +81,8 @@ install_proot_distro() {
         return 0
     fi
     
-    # 安装依赖
-    apt-get install -y -qq proot-distro
+    # 尝试更新并安装
+    apt-get update -qq && apt-get install -y -qq proot-distro
     
     if command -v proot-distro &> /dev/null; then
         log_success "proot-distro 安装完成"
@@ -128,11 +93,11 @@ install_proot_distro() {
 }
 
 # ============================================
-# 步骤 3: 安装 Debian 13
+# 步骤 2: 安装 Debian 13
 # ============================================
 
 install_debian() {
-    log_step 3 "安装 Debian 13..."
+    log_step 2 "安装 Debian 13..."
     
     # 检查是否已安装（检测 rootfs 目录）
     local rootfs_dir="$PREFIX/var/lib/proot-distro/installed-rootfs/debian"
@@ -154,27 +119,14 @@ install_debian() {
         log_error "Debian 安装失败"
         exit 1
     fi
-    
-    # 进入 Debian 配置中科大源
-    log_info "配置 Debian 中科大源..."
-    
-    proot-distro login "$DEBIAN_DISTRO" -- bash -c '
-cat > /etc/apt/sources.list << EOF
-deb https://mirrors.ustc.edu.cn/debian trixie main contrib non-free non-free-firmware
-deb https://mirrors.ustc.edu.cn/debian trixie-updates main contrib non-free non-free-firmware
-EOF
-apt-get update -qq
-'
-    
-    log_success "Debian 中科大源配置完成"
 }
 
 # ============================================
-# 步骤 4: 添加快捷命令
+# 步骤 3: 添加快捷命令
 # ============================================
 
 setup_shortcut() {
-    log_step 4 "添加快捷命令..."
+    log_step 3 "添加快捷命令..."
     
     local shortcut_path="$PREFIX/bin/$SHORTCUT_NAME"
     
@@ -215,7 +167,6 @@ main() {
     check_termux
     
     # 执行步骤
-    setup_ustc_source
     install_proot_distro
     install_debian
     setup_shortcut
@@ -233,7 +184,7 @@ main() {
     echo -e "后续步骤:"
     echo -e "  1. 输入 '${YELLOW}${SHORTCUT_NAME}${NC}' 进入 Debian 环境"
     echo -e "  2. 运行 DanHeng 部署脚本:"
-    echo -e "     ${YELLOW}curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash${NC}"
+    echo -e "     ${YELLOW}curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash${NC}"
     echo ""
 }
 

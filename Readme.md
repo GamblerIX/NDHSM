@@ -1,68 +1,32 @@
 # NDHSM - New DanHeng Server Manager
 
-一套跨平台的 DanHeng 私服管理工具集，支持 Windows、Linux 和 Termux（Android）。
+一套针对 DanHeng 的全自动部署与管理工具集，支持 Linux 服务器及安卓 Termux 环境。
 
 ## 🚀 一键部署
 
 ### Linux Debian 13
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash
 ```
 
-**无头模式（跳过交互）：**
+**通过加速代理下载（国内网络使用）：**
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --gh-proxy
 ```
 
-**手动设置 GC 内存限制（Termux 推荐）：**
-```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless --gc-limit 128
-```
+**Termux 一键部署**
 
-### Termux (Android)
-
+#### 第一步（安装 Debian）
 ```bash
 curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/TermuxToDebian13/setup_debian.sh | bash
+debian
 ```
 
-安装完成后，输入 `debian` 进入 Debian 环境，然后运行上方的 Linux 部署命令。
-
-### Windows
-
-> 需要 Python 3.10+。
+#### 第二步（Termux专用部署）
 
 ```bash
-# 远程下载并运行
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Windows/install.ps1 | powershell -
-```
-
-```bash
-# 手动运行
-git clone https://github.com/GamblerIX/DanHeng.git
-cd DanHeng/NDHSM/Windows
-pip install -r requirements.txt
-python main.py
-```
-
-## 📋 默认端口
-
-| 服务 | 端口 | 协议 |
-|------|------|------|
-| HTTP/MUIP | 23300 | TCP |
-| GameServer | 23301 | UDP |
-
-## 🔧 常用命令
-
-```bash
-# 查看服务控制台
-screen -r danheng
-
-# 分离控制台（不停止服务）
-Ctrl+A+D
-
-# 停止服务
-screen -X -S danheng quit
+bash deploy.sh --termux
 ```
 
 ## 📚 相关链接
@@ -76,4 +40,4 @@ screen -X -S danheng quit
 
 ## 📄 许可证
 
-本项目基于 GNU AGPLv3 许可证开源。
+本项目基于 [GNU AGPLv3](LICENSE) 许可证开源。

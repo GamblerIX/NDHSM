@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================
-# NDHSM Linux Debian 13 全自动部署脚本
+# NDHSM Linux DeployOnDebian13 全自动部署脚本
 # 相关文件: ../TermuxToDebian13/setup_debian.sh
 # ============================================
 #
@@ -8,14 +8,12 @@
 # 1. 自动安装系统依赖
 # 2. 从 GitHub 下载自包含版本服务器
 # 3. 克隆资源文件
-# 4. 创建 dh 用户并配置权限
-# 5. 配置防火墙
-# 6. 后台运行并自动生成/配置 Config.json
-# 7. 无需手动安装 .NET 环境 (Self-contained)
+# 4. 配置防火墙 (可选，需 root)
+# 5. 后台运行并自动生成/配置 Config.json
 #
 # 使用方法:
 #   交互模式: bash deploy.sh
-#   无头模式: bash deploy.sh --headless --http-port 23300 --game-port 23301
+#   无头模式: bash deploy.sh --termux --headless --http-port 23300
 #
 # ============================================
 
@@ -27,18 +25,20 @@ set -e
 
 # 默认配置
 DEFAULT_HTTP_PORT=23300
-DEFAULT_GAME_PORT=23301
 DEFAULT_HOST="0.0.0.0"
 INSTALL_DIR="/opt/danheng"
-SERVICE_USER="dh"
 
 # 仓库地址
 GITHUB_SERVER_RELEASES="https://api.github.com/repos/GamblerIX/DanHengServer/releases/latest"
 GITHUB_RESOURCES_REPO="https://github.com/GamblerIX/DanHengServerResources.git"
 
-# 中科大镜像
-USTC_DOTNET_FEED="https://mirrors.ustc.edu.cn/dotnet"
-USTC_APT_SOURCE="https://mirrors.ustc.edu.cn/debian"
+# GitHub 加速代理
+GITHUB_PROXIES=(
+    "https://gh-proxy.org/"
+    "https://gh.xmly.dev/"
+)
+ENABLE_GH_PROXY=false
+SELECTED_PROXY=""
 
 # 颜色定义
 RED='\033[0;31m'
@@ -88,9 +88,11 @@ progress_bar() {
 
 check_root() {
     if [ "$EUID" -ne 0 ]; then
-        log_error "请使用 root 权限运行此脚本"
-        log_info "使用: sudo bash $0"
-        exit 1
+        IS_ROOT=false
+        log_info "当前以普通用户身份运行"
+    else
+        IS_ROOT=true
+        log_info "当前以 root 身份运行"
     fi
 }
 
@@ -103,14 +105,29 @@ detect_arch() {
         aarch64|arm64)
             echo "linux-arm64"
             ;;
-        armv7l)
-            echo "linux-arm"
-            ;;
         *)
-            log_error "不支持的架构: $arch"
+            log_error "不支持的架构: $arch (目前仅支持 x64 和 arm64)"
             exit 1
             ;;
     esac
+}
+
+# 选择并检测 Github 代理
+select_github_proxy() {
+    if [ "$ENABLE_GH_PROXY" = false ]; then
+        return 0
+    fi
+    
+    log_info "正在检测可用加速代理..."
+    for proxy in "${GITHUB_PROXIES[@]}"; do
+        # 简单通过 HEAD 请求测试代理连通性
+        if curl -sSL --connect-timeout 5 -I "$proxy" &>/dev/null; then
+            SELECTED_PROXY="$proxy"
+            log_success "已选择加速代理: $SELECTED_PROXY"
+            return 0
+        fi
+    done
+    log_warning "未找到可用的加速代理，将使用原始地址"
 }
 
 # ============================================
@@ -119,11 +136,12 @@ detect_arch() {
 
 HEADLESS=false
 HTTP_PORT=$DEFAULT_HTTP_PORT
-GAME_PORT=$DEFAULT_GAME_PORT
 PUBLIC_HOST=$DEFAULT_HOST
-SKIP_FIREWALL=false
-CONFIG_FILE=""
+SKIP_FIREWALL=true  # 默认跳过
+TERMUX_MODE=false
 GC_LIMIT=""  # 空表示自动检测
+DELETE_MODE=false  # 彻底删除模式
+USE_MYSQL=false    # 使用 MySQL 数据库
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -136,29 +154,41 @@ parse_args() {
                 HTTP_PORT="$2"
                 shift 2
                 ;;
-            --game-port)
-                GAME_PORT="$2"
-                shift 2
-                ;;
             --host)
                 PUBLIC_HOST="$2"
                 shift 2
                 ;;
-            --skip-firewall)
-                SKIP_FIREWALL=true
+            --open-firewall)
+                SKIP_FIREWALL=false
                 shift
                 ;;
-            --config)
-                CONFIG_FILE="$2"
-                shift 2
+            --termux)
+                TERMUX_MODE=true
+                HEADLESS=true  # Termux 模式强制无头
+                ENABLE_GH_PROXY=true  # Termux 模式自动开启加速
+                # Termux 模式下，如果不指定 GC 限制，则默认为 128
+                [ -z "$GC_LIMIT" ] && GC_LIMIT=128
+                shift
                 ;;
             --gc-limit)
                 GC_LIMIT="$2"
                 shift 2
                 ;;
+            --gh-proxy)
+                ENABLE_GH_PROXY=true
+                shift
+                ;;
             --help|-h)
                 show_help
                 exit 0
+                ;;
+            --delete)
+                DELETE_MODE=true
+                shift
+                ;;
+            --mysql)
+                USE_MYSQL=true
+                shift
                 ;;
             *)
                 log_error "未知参数: $1"
@@ -171,94 +201,101 @@ parse_args() {
 
 show_help() {
     cat << EOF
-NDHSM Linux Debian 13 全自动部署脚本
+NDHSM Linux DeployOnDebian13 全自动部署脚本
 
 用法: bash deploy.sh [选项]
 
 选项:
   --headless, -H      无头模式，跳过交互
   --http-port PORT    HTTP/MUIP 端口（默认: $DEFAULT_HTTP_PORT）
-  --game-port PORT    游戏服务器端口（默认: $DEFAULT_GAME_PORT）
   --host HOST         公网地址（默认: $DEFAULT_HOST）
-  --skip-firewall     跳过防火墙配置
+  --open-firewall     尝试配置防火墙（默认跳过，需要 root 权限）
+  --termux            Termux 优化（无头模式 + GC 限制 128MB）
   --gc-limit MB       手动设置 GC 内存限制 (单位 MB，默认自动检测)
-  --config FILE       从配置文件读取参数
+  --gh-proxy          开启 GitHub 下载加速（自动从预设中选择）
+  --delete            彻底删除安装目录及全部数据
+  --mysql             将数据库类型替换为 MySQL
   --help, -h          显示帮助信息
 
 示例:
   # 交互模式
   bash deploy.sh
 
-  # 无头模式
-  bash deploy.sh --headless --http-port 443 --game-port 23301
+  # 无头模式 (Termux)
+  bash deploy.sh --termux --headless --http-port 23300
 EOF
 }
 
 # ============================================
-# 步骤 1: 配置中科大源
+# 删除安装功能
 # ============================================
 
-setup_ustc_source() {
-    log_step 1 "配置中科大源..."
+delete_installation() {
+    echo ""
+    echo -e "${RED}============================================${NC}"
+    echo -e "${RED}  彻底删除模式${NC}"
+    echo -e "${RED}============================================${NC}"
+    echo ""
     
-    # 备份原有源
-    if [ -f /etc/apt/sources.list ]; then
-        cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    if [ ! -d "$INSTALL_DIR" ]; then
+        log_info "安装目录不存在: $INSTALL_DIR"
+        exit 0
     fi
     
-    # 获取当前版本代号（默认 bookworm）
-    local codename="bookworm"
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        if [ -n "$VERSION_CODENAME" ]; then
-            codename="$VERSION_CODENAME"
+    # 非无头模式下请求确认
+    if [ "$HEADLESS" = false ]; then
+        echo -e "${YELLOW}警告: 此操作将删除以下内容:${NC}"
+        echo -e "  - 目录: $INSTALL_DIR"
+        echo -e "  - 所有配置文件、日志、数据库"
+        echo ""
+        read -p "确认删除？输入 'yes' 继续: " confirm
+        if [ "$confirm" != "yes" ]; then
+            log_info "操作已取消"
+            exit 0
         fi
     fi
-    log_info "检测到 Debian 版本: $codename"
-
-    # 写入中科大源
-    # 注意：trixie (testing) 安全源 URL 可能不同，这里统一处理通用格式
-    if [ "$codename" == "trixie" ] || [ "$codename" == "sid" ]; then
-        # Testing/Sid 版本
-        cat > /etc/apt/sources.list << EOF
-deb ${USTC_APT_SOURCE} $codename main contrib non-free non-free-firmware
-deb ${USTC_APT_SOURCE} ${codename}-updates main contrib non-free non-free-firmware
-deb https://mirrors.ustc.edu.cn/debian-security ${codename}-security main contrib non-free non-free-firmware
-EOF
-    else
-        # Stable (bookworm) 及旧版本
-        cat > /etc/apt/sources.list << EOF
-deb ${USTC_APT_SOURCE} $codename main contrib non-free non-free-firmware
-deb ${USTC_APT_SOURCE} ${codename}-updates main contrib non-free non-free-firmware
-deb ${USTC_APT_SOURCE} ${codename}-backports main contrib non-free non-free-firmware
-deb https://mirrors.ustc.edu.cn/debian-security ${codename}-security main contrib non-free non-free-firmware
-EOF
-    fi
     
-    apt-get update -qq
-    log_success "中科大源配置完成"
+    # 停止服务
+    log_info "正在停止服务..."
+    pkill -f "$INSTALL_DIR/DanhengServer" 2>/dev/null || true
+    pkill -f "$INSTALL_DIR/GameServer" 2>/dev/null || true
+    sleep 2
+    
+    # 删除目录
+    log_info "正在删除安装目录..."
+    rm -rf "$INSTALL_DIR"
+    
+    log_success "已彻底删除 $INSTALL_DIR"
+    exit 0
 }
 
 # ============================================
-# 步骤 2: 安装依赖
+# 步骤 1: 安装依赖
 # ============================================
 
 install_dependencies() {
-    log_step 1 "安装依赖..."
+    log_step 1 "检查并安装依赖..."
     
-    # 更新包列表
-    apt-get update -qq
-    
-    apt-get install -y -qq \
-        curl \
-        wget \
-        git \
-        unzip \
-        screen \
-        jq \
-        ca-certificates \
-        apt-transport-https \
-        libicu-dev
+    # 定义所有必需的软件包
+    local deps=("curl" "wget" "git" "unzip" "p7zip-full" "jq" "ca-certificates" "apt-transport-https" "libicu-dev")
+    local missing=()
+
+    # 统一通过 dpkg 检查包是否安装
+    for dep in "${deps[@]}"; do
+        if ! dpkg-query -W -f='${Status}' "$dep" 2>/dev/null | grep -q "ok installed"; then
+            missing+=("$dep")
+        fi
+    done
+
+    # 如果没有缺失项，直接返回
+    if [ ${#missing[@]} -eq 0 ]; then
+        log_success "所有核心依赖已就绪，跳过安装步骤"
+        return 0
+    fi
+
+    # 执行安装
+    log_info "待安装依赖: ${missing[*]}"
+    apt-get update -qq && apt-get install -y -qq "${missing[@]}"
     
     log_success "依赖安装完成"
 }
@@ -312,8 +349,6 @@ download_server() {
         local url
         url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\") and contains(\"self-contained\")) | .browser_download_url" 2>/dev/null | head -1)
         
-
-        
         echo "$url"
     }
 
@@ -322,8 +357,7 @@ download_server() {
     
     # 检查是否成功
     if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
-        log_error "未找到适用的下载包"
-        log_info "请手动下载 Release 包并解压到: $INSTALL_DIR"
+        log_error "未找到适用的下载包，这不是您的问题，请在Github上提交Issue"
         exit 1
     fi
     
@@ -331,7 +365,13 @@ download_server() {
     
     # 下载
     filename=$(basename "$download_url")
-    if wget --show-progress -O "$filename" "$download_url"; then
+    local final_url="$download_url"
+    if [ -n "$SELECTED_PROXY" ]; then
+        final_url="${SELECTED_PROXY}${download_url}"
+        log_info "使用加速地址下载..."
+    fi
+
+    if wget --show-progress -O "$filename" "$final_url"; then
         log_success "下载成功"
     else
         log_error "下载失败"
@@ -351,18 +391,22 @@ download_server() {
              log_error "解压失败 (tar)"
              exit 1
         fi
+    elif [[ $filename == *.7z ]]; then
+        if ! 7z x -y "$filename" > /dev/null; then
+            log_error "解压失败 (7z)"
+            exit 1
+        fi
     else
-        log_warning "未知的压缩格式，尝试保留文件"
+        log_error "不支持的压缩格式: $filename，这不是您的问题，请在Github上提交Issue"
+        exit 1
     fi
     
     # 保留压缩包，待服务成功启动后删除
-    # rm -f "$filename" 已移至 configure_server 函数末尾
     
     # 将子目录内容移至安装目录根目录
-    # Release 包解压后会创建类似 linux-arm64-self-contained/ 的子目录
     for subdir in "$INSTALL_DIR"/*-self-contained "$INSTALL_DIR"/*-self-contained/; do
         if [ -d "$subdir" ]; then
-            log_info "正在整理文件结构..."
+            log_info "正在整理文件结构...（该步骤可能需要较长时间）"
             mv "$subdir"/* "$INSTALL_DIR/" 2>/dev/null || true
             rmdir "$subdir" 2>/dev/null || true
         fi
@@ -376,7 +420,7 @@ download_server() {
 # ============================================
 
 clone_resources() {
-    log_step 3 "克隆资源文件..."
+    log_step 3 "克隆资源文件...）"
     
     local resources_dir="$INSTALL_DIR/Resources"
     
@@ -386,9 +430,13 @@ clone_resources() {
     fi
     
     local repo_url="$GITHUB_RESOURCES_REPO"
+    local final_repo="$repo_url"
+    if [ -n "$SELECTED_PROXY" ]; then
+        final_repo="${SELECTED_PROXY}${repo_url}"
+    fi
     
-    log_info "正在克隆资源仓库..."
-    git clone --depth 1 "$repo_url" "$resources_dir"
+    log_info "正在克隆资源仓库...（该步骤可能需要较长时间）"
+    git clone --depth 1 "$final_repo" "$resources_dir"
     
     log_success "资源文件克隆完成"
 }
@@ -405,9 +453,6 @@ configure_server() {
     # 等待 Config.json 生成 (服务首次启动会自动创建)
     log_info "等待配置文件生成..."
     mkdir -p "$INSTALL_DIR/Config"
-    chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR/Config"
-    mkdir -p "$INSTALL_DIR/Config"
-    chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR/Config"
     local wait_count=0
     while [ ! -f "$config_path" ] && [ $wait_count -lt 30 ]; do
         sleep 1
@@ -415,13 +460,13 @@ configure_server() {
     done
     
     if [ ! -f "$config_path" ]; then
-        log_warning "Config.json 未生成，使用默认配置"
-        return 0
+        log_error "Config.json 未能由服务端自动生成，部署无法继续"
+        exit 1
     fi
     
     # 停止服务
     log_info "停止服务以修改配置..."
-    screen -X -S danheng quit 2>/dev/null || true
+    pkill -f "$INSTALL_DIR/DanhengServer" || pkill -f "$INSTALL_DIR/GameServer" || true
     sleep 2
     
     # 交互模式下询问用户
@@ -433,9 +478,6 @@ configure_server() {
         read -p "HTTP/MUIP 端口 [${HTTP_PORT}]: " input
         HTTP_PORT=${input:-$HTTP_PORT}
         
-        read -p "游戏服务器端口 [${GAME_PORT}]: " input
-        GAME_PORT=${input:-$GAME_PORT}
-        
         read -p "公网地址 [${PUBLIC_HOST}]: " input
         PUBLIC_HOST=${input:-$PUBLIC_HOST}
         
@@ -446,14 +488,19 @@ configure_server() {
     if command -v jq &>/dev/null; then
         local tmp_config=$(mktemp)
         jq --arg http_port "$HTTP_PORT" \
-           --arg game_port "$GAME_PORT" \
            --arg public_host "$PUBLIC_HOST" \
            '.HttpServer.Port = ($http_port | tonumber) |
-            .HttpServer.PublicAddress = $public_host |
-            .GameServer.Port = ($game_port | tonumber) |
-            .GameServer.PublicAddress = $public_host' \
+            .HttpServer.PublicAddress = $public_host' \
            "$config_path" > "$tmp_config" && mv "$tmp_config" "$config_path"
         log_success "配置文件已更新: $config_path"
+        
+        # MySQL 配置替换
+        if [ "$USE_MYSQL" = true ]; then
+            log_info "应用 MySQL 数据库配置..."
+            local tmp_mysql=$(mktemp)
+            jq '.Database.DatabaseType = "mysql"' "$config_path" > "$tmp_mysql" && mv "$tmp_mysql" "$config_path"
+            log_success "数据库类型已切换为 MySQL"
+        fi
     else
         log_warning "jq 未安装，跳过配置修改 (使用默认值)"
     fi
@@ -467,56 +514,21 @@ configure_server() {
     elif [ -f "GameServer" ]; then
         server_exe="./GameServer"
     else
-        log_error "未找到服务器可执行文件"
+        log_error "未找到服务端可执行文件"
         exit 1
     fi
     
     chmod +x "$server_exe"
-    chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
-    su - "$SERVICE_USER" -c "cd $INSTALL_DIR && screen -dmS danheng $server_exe"
-    sleep 2
     
-    if screen -list | grep -q "danheng"; then
-        log_success "服务已重新启动"
-        
-        # 清理下载的压缩包
+    nohup "$server_exe" > "$INSTALL_DIR/server.log" 2>&1 &
+    local server_pid=$!
+    sleep 3
+    
+    if kill -0 "$server_pid" 2>/dev/null; then
+        log_success "服务已重新启动 (PID: $server_pid)"
         rm -f "$INSTALL_DIR"/*.zip "$INSTALL_DIR"/*.tar.gz 2>/dev/null || true
     else
-        log_error "服务重启失败"
-        exit 1
-    fi
-}
-
-# ============================================
-# 步骤 4: 创建用户和权限
-# ============================================
-
-setup_user() {
-    log_step 4 "配置用户和权限..."
-    
-    # 创建 dh 用户
-    if ! id "$SERVICE_USER" &>/dev/null; then
-        useradd -r -s /bin/bash -d "$INSTALL_DIR" "$SERVICE_USER"
-        log_info "已创建用户: $SERVICE_USER"
-    else
-        log_info "用户 $SERVICE_USER 已存在"
-    fi
-    
-    # 预创建必要目录
-    log_info "正在预创建必要目录..."
-    mkdir -p "$INSTALL_DIR/Config/Database"
-    mkdir -p "$INSTALL_DIR/Logs"
-    mkdir -p "$INSTALL_DIR/Plugins"
-    
-    # 设置目录所有权
-    chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
-    
-    # 仅设置 DanhengServer 可执行权限
-    if [ -f "$INSTALL_DIR/DanhengServer" ]; then
-        chmod +x "$INSTALL_DIR/DanhengServer"
-        log_success "权限配置完成"
-    else
-        log_error "DanhengServer 不存在，部署失败"
+        log_error "服务重启失败，请检查日志: $INSTALL_DIR/server.log"
         exit 1
     fi
 }
@@ -526,48 +538,46 @@ setup_user() {
 # ============================================
 
 configure_firewall() {
-    log_step 5 "配置防火墙..."
-    
     if [ "$SKIP_FIREWALL" = true ]; then
         log_info "跳过防火墙配置"
         return 0
     fi
     
+    if [ "$IS_ROOT" = false ]; then
+        log_warning "缺少 root 权限，无法配置防火墙，已跳过"
+        return 0
+    fi
+
+    log_step 5 "配置防火墙..."
+    
     # 检测防火墙类型并配置
     if command -v ufw &> /dev/null; then
         log_info "检测到 UFW..."
-        if ufw allow "$HTTP_PORT"/tcp && ufw allow "$GAME_PORT"/udp; then
+        if ufw allow "$HTTP_PORT"/tcp; then
             log_success "UFW 规则已添加"
         else
-            log_warning "UFW 规则添加失败 (可能是环境限制)"
+            log_warning "UFW 规则添加失败"
         fi
         
     elif command -v firewall-cmd &> /dev/null; then
         log_info "检测到 firewalld..."
-        if firewall-cmd --permanent --add-port="$HTTP_PORT"/tcp && \
-           firewall-cmd --permanent --add-port="$GAME_PORT"/udp; then
+        if firewall-cmd --permanent --add-port="$HTTP_PORT"/tcp; then
             firewall-cmd --reload || true
             log_success "firewalld 规则已添加"
         else
-            log_warning "firewalld 规则添加失败 (可能是环境限制)"
+            log_warning "firewalld 规则添加失败"
         fi
         
     elif command -v iptables &> /dev/null; then
-        # 先测试 iptables 是否可用（Termux 环境可能无权限）
-        if ! iptables -L -n &>/dev/null; then
-            log_info "iptables 不可用 (可能是环境限制)，跳过配置"
+        log_info "检测到 iptables..."
+        if iptables -I INPUT -p tcp --dport "$HTTP_PORT" -j ACCEPT; then
+            log_success "iptables 规则已添加（注意：重启后可能失效，建议安装 iptables-persistent 永久保存）"
         else
-            log_info "使用 iptables..."
-            if iptables -A INPUT -p tcp --dport "$HTTP_PORT" -j ACCEPT && \
-               iptables -A INPUT -p udp --dport "$GAME_PORT" -j ACCEPT; then
-                log_success "iptables 规则已添加"
-            else
-                log_warning "iptables 规则添加失败"
-            fi
+            log_warning "iptables 规则添加失败"
         fi
         
     else
-        log_info "未检测到防火墙工具，跳过配置"
+        log_info "未检测到常见防火墙或配置失败，建议手动开放端口: $HTTP_PORT"
     fi
 }
 
@@ -594,9 +604,6 @@ start_server() {
     chmod +x "$server_exe"
     log_info "可执行文件: $server_exe"
     
-    # 使用 screen 启动
-    log_info "使用 screen 启动服务..."
-    
     # 计算 GC 堆限制
     local gc_limit
     if [ -n "$GC_LIMIT" ]; then
@@ -616,27 +623,24 @@ start_server() {
     fi
     
     export DOTNET_GCHeapHardLimit=$gc_limit
-    export DOTNET_GC_HEAP_LIMIT=$gc_limit # 兼容性设置
+    export DOTNET_GC_HEAP_LIMIT=$gc_limit
     export DOTNET_EnableDiagnostics=0
     export DOTNET_gcServer=0
-    export DOTNET_EnableGCServer=0 # 兼容性别名
     export DOTNET_TieredCompilation=0
-    export DOTNET_HeapAllocRateLimit=1
     export DOTNET_GCConcurrent=1
+
     
-    screen -dmS danheng "$server_exe"
-    
+    # 使用 nohup 启动
+    log_info "使用 nohup 后台启动服务..."
+    nohup "$server_exe" > "$INSTALL_DIR/server.log" 2>&1 &
+    local server_pid=$!
     sleep 3
     
-    # 检查是否启动成功
-    if screen -list | grep -q "danheng"; then
-        log_success "服务已启动"
-        log_info "使用 'screen -r danheng' 查看控制台"
-        log_info "使用 Ctrl+A+D 分离控制台"
+    if kill -0 "$server_pid" 2>/dev/null; then
+        log_success "服务已启动 (PID: $server_pid)"
+        log_info "日志文件: $INSTALL_DIR/server.log"
     else
-        log_error "服务启动失败"
-        log_info "尝试手动启动以查看错误信息:"
-        log_info "  cd $INSTALL_DIR && $server_exe"
+        log_error "服务启动失败，请检查日志: $INSTALL_DIR/server.log"
         exit 1
     fi
 }
@@ -650,22 +654,28 @@ TOTAL_STEPS=7
 main() {
     echo ""
     echo -e "${CYAN}============================================${NC}"
-    echo -e "${CYAN}  NDHSM Linux Debian 13 自动部署脚本${NC}"
+    echo -e "${CYAN}  NDHSM Linux DeployOnDebian13 自动部署脚本${NC}"
     echo -e "${CYAN}============================================${NC}"
     echo ""
     
     # 解析参数
     parse_args "$@"
     
-    # 检查 root 权限
+    # 删除模式检测
+    if [ "$DELETE_MODE" = true ]; then
+        delete_installation
+    fi
+    
+    # 选项：Github 加速
+    select_github_proxy
+
+    # 检查 root 权限 (用于防火墙等可选功能)
     check_root
     
     # 执行部署步骤
-    # setup_ustc_source
     install_dependencies
     download_server
     clone_resources
-    setup_user
     configure_firewall
     start_server
     configure_server
@@ -677,13 +687,11 @@ main() {
     echo ""
     echo -e "安装目录: ${CYAN}$INSTALL_DIR${NC}"
     echo -e "HTTP 端口: ${CYAN}$HTTP_PORT${NC}"
-    echo -e "游戏端口: ${CYAN}$GAME_PORT${NC}"
-    echo -e "运行用户: ${CYAN}$SERVICE_USER${NC}"
+    echo -e "运行用户: ${CYAN}$(whoami)${NC}"
     echo ""
     echo -e "管理命令:"
-    echo -e "  查看控制台: ${YELLOW}screen -r danheng${NC}"
-    echo -e "  分离控制台: ${YELLOW}Ctrl+A+D${NC}"
-    echo -e "  停止服务:   ${YELLOW}screen -X -S danheng quit${NC}"
+    echo -e "  查看日志:   ${YELLOW}tail -f $INSTALL_DIR/server.log${NC}"
+    echo -e "  停止服务:   ${YELLOW}pkill -f $INSTALL_DIR/DanhengServer${NC}"
     echo ""
 }
 
