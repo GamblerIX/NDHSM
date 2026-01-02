@@ -12,7 +12,7 @@ curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/D
 
 **通过加速代理下载（国内网络使用）：**
 ```bash
-# 自动选择最快代理
+# 自动使用可用代理
 curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --gh-proxy
 
 # 强制指定特定代理 (例如强制使用 gh-proxy.org)
@@ -21,7 +21,7 @@ curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/D
 
 **Termux 一键部署**
 
-> Termux部署方式始终使用国内加速网络，且脚本会自动进行**带宽竞速测试**，从多个预设代理中选取下载速度最快的节点。
+> Termux 部署方式始终使用国内加速网络。
 
 #### 第一步（安装 Debian）
 ```bash

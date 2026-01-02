@@ -118,65 +118,21 @@ detect_arch() {
     esac
 }
 
-# 选择带宽吞吐量最高的 Github 代理
-select_github_proxy() {
+# 获取代理列表工具函数
+get_effective_proxies() {
     if [ "$ENABLE_GH_PROXY" = false ]; then
-        return 0
+        echo ""
+        return
     fi
-    
-    local test_url="https://github.com/GamblerIX/DanHengProxy/releases/download/v2.3.1/DanHengProxy_win-x64_v2.3.1.zip"
-    
-    # 如果强制指定了代理
     if [ -n "$FORCED_PROXY" ]; then
-        log_info "正在检测强制指定的代理: $FORCED_PROXY"
-        local final_test_url="${FORCED_PROXY}${test_url}"
-        
-        # 测速并真实下载一点点数据（5秒采样）
-        local speed=$(curl -sL --connect-timeout 5 --max-time 6 -o "proxy_test.tmp" -w "%{speed_download}" "$final_test_url" 2>/dev/null | cut -d'.' -f1 || echo 0)
-        rm -f "proxy_test.tmp"
-        
-        if [ "$speed" -le 0 ]; then
-            log_error "强制指定的代理无法连接或速度极慢，已终止部署"
-            exit 1
-        fi
-        
-        SELECTED_PROXY="$FORCED_PROXY"
-        log_success "强制代理检测通过！估算带宽: $((speed / 1024)) KB/s"
-        return 0
+        echo "$FORCED_PROXY"
+        return
     fi
-
-    log_info "正在对可用加速代理进行带宽竞速测试 (采样源: DanHengProxy Release)..."
-    local max_speed=0
-    local best_proxy=""
-    
-    for proxy in "${GITHUB_PROXIES[@]}"; do
-        # 采样真实的 GitHub Release 文件以获取更准确的带宽数据
-        local final_test_url="${proxy}${test_url}"
-        
-        # 执行 4 秒采样下载
-        local speed=$(curl -sL --connect-timeout 3 --max-time 4 -o "proxy_test.tmp" -w "%{speed_download}" "$final_test_url" 2>/dev/null | cut -d'.' -f1 || echo 0)
-        rm -f "proxy_test.tmp"
-        
-        local speed_kb=$((speed / 1024))
-        log_info "-> 节点: $proxy | 估算带宽: ${speed_kb} KB/s" >&2
-
-        if [ "$speed" -gt "$max_speed" ]; then
-            max_speed=$speed
-            best_proxy=$proxy
-        fi
+    # 返回所有预设代理，最后尝试直连 ("")
+    for p in "${GITHUB_PROXIES[@]}"; do
+        echo "$p"
     done
-
-    if [ -n "$best_proxy" ] && [ "$max_speed" -gt 0 ]; then
-        SELECTED_PROXY="$best_proxy"
-        local final_speed_kb=$((max_speed / 1024))
-        log_success "竞速完成！已选择最优带宽代理: $SELECTED_PROXY (峰值约 ${final_speed_kb} KB/s)"
-    elif [ "$TERMUX_MODE" = true ]; then
-        # Termux 下如果全挂了，往往是本地 DNS 或出口受限，强制选第一个作为尝试
-        SELECTED_PROXY="${GITHUB_PROXIES[0]}"
-        log_warning "所有代理测速响应异常，但在 Termux 模式下将强制尝试首选代理: $SELECTED_PROXY"
-    else
-        log_warning "未能检测到有效带宽的代理，将尝试直连模式"
-    fi
+    echo ""
 }
 
 # ============================================
@@ -387,68 +343,74 @@ download_server() {
         local api_url="$1"
         local source_name="$2"
         
-        log_info "正在尝试从 $source_name 获取版本信息..." >&2
+        local proxies
+        proxies=$(get_effective_proxies)
         
-        local final_api_url="$api_url"
-        if [ -n "$SELECTED_PROXY" ]; then
-            final_api_url="${SELECTED_PROXY}${api_url}"
-            log_info "使用加速代理访问 API..." >&2
-        fi
+        for proxy in $proxies; do
+            local final_api_url="${proxy}${api_url}"
+            [ -n "$proxy" ] && log_info "尝试通过代理获取版本信息: $proxy" >&2 || log_info "尝试直连获取版本信息..." >&2
 
-        local release_info
-        if ! release_info=$(curl -sSL --connect-timeout 10 "$final_api_url" 2>/dev/null); then
-            log_warning "无法通过当前连接获取 $source_name API 信息" >&2
-            
-            # 如果刚才用了代理，尝试回退到直连作为保底
-            if [ -n "$SELECTED_PROXY" ]; then
-                log_info "尝试直连访问 API..." >&2
-                if ! release_info=$(curl -sSL --connect-timeout 10 "$api_url" 2>/dev/null); then
-                    return 1
+            local release_info
+            if release_info=$(curl -sSL --connect-timeout 10 "$final_api_url" 2>/dev/null); then
+                if [ -n "$release_info" ] && [ "$release_info" != "null" ] && echo "$release_info" | jq . >/dev/null 2>&1; then
+                    # 尝试匹配架构 (仅下载 self-contained 版本)
+                    local url
+                    url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\") and contains(\"self-contained\")) | .browser_download_url" 2>/dev/null | head -1)
+                    if [ -n "$url" ] && [ "$url" != "null" ]; then
+                        echo "$url"
+                        return 0
+                    fi
                 fi
-            else
+            fi
+            
+            # 如果是强制代理模式且失败了，直接报错
+            if [ -n "$FORCED_PROXY" ]; then
+                log_error "强制指定的代理无法获取 API 信息" >&2
                 return 1
             fi
-        fi
-
-        if [ -z "$release_info" ] || [ "$release_info" == "null" ]; then
-             log_warning "$source_name API 返回数据无效" >&2
-             return 1
-        fi
-        
-        # 尝试匹配架构 (仅下载 self-contained 版本)
-        local url
-        url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\") and contains(\"self-contained\")) | .browser_download_url" 2>/dev/null | head -1)
-        
-        echo "$url"
+        done
+        return 1
     }
 
-    # 从 GitHub 获取下载链接
+    # 获取下载链接
     download_url=$(get_download_url "$GITHUB_SERVER_RELEASES" "GitHub")
     
     # 检查是否成功
     if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
-        log_error "未找到适用的下载包，这通常是由于网络无法连接到 GitHub API 导致的。"
-        log_error "请检查您的网络连接，或尝试多次运行脚本。"
+        log_error "在所有尝试（含代理）后均未能获取有效的下载链接，请检查网络或稍后重试"
         exit 1
     fi
     
-    log_info "下载地址: $download_url"
+    log_info "解析到资产下载地址: $download_url"
     
-    # 下载
+    # 下载执行
     filename=$(basename "$download_url")
-    local final_url="$download_url"
-    if [ -n "$SELECTED_PROXY" ]; then
-        final_url="${SELECTED_PROXY}${download_url}"
-        log_info "使用加速地址下载..."
-    fi
+    local success=false
+    local proxies
+    proxies=$(get_effective_proxies)
 
-    if wget --show-progress -O "$filename" "$final_url"; then
-        log_success "下载成功"
-    else
-        log_error "下载失败"
-        rm -f "$filename"
+    for proxy in $proxies; do
+        local final_url="${proxy}${download_url}"
+        [ -n "$proxy" ] && log_info "尝试通过代理下载: $proxy" || log_info "尝试直连下载..."
+        
+        if wget --show-progress -O "$filename" "$final_url"; then
+            success=true
+            break
+        fi
+
+        if [ -n "$FORCED_PROXY" ]; then
+            log_error "强制指定的代理下载失败"
+            exit 1
+        fi
+        log_warning "当前节点下载失败，尝试下一个..."
+    done
+
+    if [ "$success" = false ]; then
+        log_error "所有下载方式均已失败"
         exit 1
     fi
+    
+    log_success "下载成功"
     
     # 解压
     log_info "正在解压..."
@@ -501,13 +463,30 @@ clone_resources() {
     fi
     
     local repo_url="$GITHUB_RESOURCES_REPO"
-    local final_repo="$repo_url"
-    if [ -n "$SELECTED_PROXY" ]; then
-        final_repo="${SELECTED_PROXY}${repo_url}"
+    local success=false
+    local proxies
+    proxies=$(get_effective_proxies)
+
+    for proxy in $proxies; do
+        local final_repo="${proxy}${repo_url}"
+        [ -n "$proxy" ] && log_info "尝试通过代理克隆资源: $proxy" || log_info "尝试直连克隆资源..."
+        
+        if git clone --depth 1 "$final_repo" "$resources_dir"; then
+            success=true
+            break
+        fi
+
+        if [ -n "$FORCED_PROXY" ]; then
+            log_error "强制指定的代理克隆资源失败"
+            exit 1
+        fi
+        log_warning "当前节点克隆失败，尝试下一个..."
+    done
+
+    if [ "$success" = false ]; then
+        log_error "所有克隆方式均已失败"
+        exit 1
     fi
-    
-    log_info "正在克隆资源仓库...（该步骤可能需要较长时间）"
-    git clone --depth 1 "$final_repo" "$resources_dir"
     
     log_success "资源文件克隆完成"
 }
@@ -737,9 +716,6 @@ main() {
         delete_installation
     fi
     
-    # 选项：Github 加速
-    select_github_proxy
-
     # 检查 root 权限 (用于防火墙等可选功能)
     check_root
     
