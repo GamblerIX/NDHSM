@@ -31,7 +31,7 @@ INSTALL_DIR="/opt/danheng"
 
 # 仓库地址
 GITHUB_SERVER_RELEASES="https://api.github.com/repos/GamblerIX/DanHengServer/releases/latest"
-GITHUB_RESOURCES_REPO="https://github.com/GamblerIX/DanHengServerResources.git"
+GITHUB_RESOURCES_RELEASES="https://api.github.com/repos/GamblerIX/DanHengServerResources/releases/latest"
 
 # GitHub 加速代理
 GITHUB_PROXIES=(
@@ -464,21 +464,20 @@ download_server() {
 }
 
 # ============================================
-# 步骤 4: 克隆资源文件
+# 步骤 3: 下载资源文件 (ZIP)
 # ============================================
 
-clone_resources() {
-    log_step 3 "克隆资源文件...）"
+download_resources() {
+    log_step 3 "下载资源文件..."
     
     local resources_dir="$INSTALL_DIR/Resources"
     
     if [ -d "$resources_dir" ]; then
-        log_info "Resources 目录已存在，跳过克隆"
+        log_info "Resources 目录已存在，跳过下载"
         return 0
     fi
     
-    local repo_url="$GITHUB_RESOURCES_REPO"
-    local success=false
+    cd "$INSTALL_DIR"
     
     # 构建代理尝试列表
     local try_list=()
@@ -489,32 +488,98 @@ clone_resources() {
     else
         try_list=("")
     fi
-
+    
+    # 获取资源 ZIP 下载地址
+    local download_url=""
+    log_info "正在获取资源文件下载地址..."
+    
     for proxy in "${try_list[@]}"; do
-        local final_repo="${proxy}${repo_url}"
+        local final_api_url="${proxy}${GITHUB_RESOURCES_RELEASES}"
         local prefix_info="直连"
         [ -n "$proxy" ] && prefix_info="代理 $proxy"
-
-        log_info "正在尝试克隆仓库 ($prefix_info)..."
         
-        if git clone --depth 1 "$final_repo" "$resources_dir"; then
-            success=true
-            break
+        log_info "正在尝试获取资源版本信息 ($prefix_info)..."
+        
+        local release_info
+        if release_info=$(curl -sSL --connect-timeout 10 --retry 2 "$final_api_url" 2>/dev/null); then
+            if [ -n "$release_info" ] && [ "$release_info" != "null" ] && echo "$release_info" | jq . >/dev/null 2>&1; then
+                # 查找 zipball 或 assets 中的 ZIP 文件
+                download_url=$(echo "$release_info" | jq -r '.zipball_url // .assets[0].browser_download_url' 2>/dev/null)
+                if [ -n "$download_url" ] && [ "$download_url" != "null" ]; then
+                    break
+                fi
+            fi
         fi
-
+        
         if [ -n "$FORCED_PROXY" ]; then
-            log_error "强制指定的代理克隆资源失败"
+            log_error "强制指定的代理无法获取资源 API 信息"
             exit 1
         fi
-        log_warning "当前节点克隆失败，尝试下一个..."
     done
-
-    if [ "$success" = false ]; then
-        log_error "所有克隆方式均已失败"
+    
+    if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
+        log_error "无法获取资源文件下载地址"
         exit 1
     fi
     
-    log_success "资源文件克隆完成"
+    log_info "解析到资源下载地址: $download_url"
+    
+    # 下载 ZIP 文件
+    local filename="resources.zip"
+    local success=false
+    
+    for proxy in "${try_list[@]}"; do
+        local final_url="${proxy}${download_url}"
+        local prefix_info="直连"
+        [ -n "$proxy" ] && prefix_info="代理 $proxy"
+        
+        log_info "正在尝试下载资源文件 ($prefix_info)..."
+        
+        if wget --show-progress -O "$filename" "$final_url"; then
+            success=true
+            break
+        fi
+        
+        if [ -n "$FORCED_PROXY" ]; then
+            log_error "强制指定的代理下载资源失败"
+            rm -f "$filename"
+            exit 1
+        fi
+        log_warning "当前节点下载失败，尝试下一个..."
+    done
+    
+    if [ "$success" = false ]; then
+        log_error "所有资源下载方式均已失败"
+        rm -f "$filename"
+        exit 1
+    fi
+    
+    # 解压 ZIP 文件
+    log_info "正在解压资源文件..."
+    if ! unzip -o -q "$filename"; then
+        log_error "资源文件解压失败"
+        rm -f "$filename"
+        exit 1
+    fi
+    
+    # 整理目录结构 (GitHub zipball 会创建带版本号的子目录)
+    for subdir in "$INSTALL_DIR"/GamblerIX-DanHengServerResources-* "$INSTALL_DIR"/DanHengServerResources-*; do
+        if [ -d "$subdir" ]; then
+            log_info "正在整理资源目录结构..."
+            mv "$subdir" "$resources_dir" 2>/dev/null || true
+            break
+        fi
+    done
+    
+    # 清理下载的 ZIP 文件
+    rm -f "$filename"
+    
+    if [ ! -d "$resources_dir" ]; then
+        log_error "资源目录未能正确创建"
+        exit 1
+    fi
+    
+    log_success "资源文件下载完成"
 }
 
 # ============================================
@@ -748,7 +813,7 @@ main() {
     # 执行部署步骤
     install_dependencies
     download_server
-    clone_resources
+    download_resources
     configure_firewall
     start_server
     configure_server

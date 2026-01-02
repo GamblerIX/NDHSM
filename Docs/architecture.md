@@ -22,7 +22,7 @@ NDHSM/
 1. **依赖检测与安装** - 使用 `dpkg-query` 精准检测（curl, wget, git, unzip, jq, libicu-dev 等）。
 2. **选择并检测代理** - (可选) `--gh-proxy` 自动测速并选择可用的 GitHub 加速代理。
 3. **下载服务器** - 从 GitHub Releases 获取 self-contained 版本。
-4. **克隆资源文件** - 克隆 DanHengServerResources 仓库。
+4. **下载资源文件** - 从 GitHub Releases 下载 DanHengServerResources ZIP 包。
 5. **配置防火墙** - 支持 `ufw`, `firewalld` 和 `iptables`。
 6. **启动服务** - 使用 `nohup` 后台运行，日志重定向至 `server.log`。
 7. **配置 Config.json** - 服务启动后自动生成并使用 `jq` 修改。
