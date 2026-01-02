@@ -15,7 +15,7 @@
 #
 # 使用方法:
 #   交互模式: bash deploy.sh
-#   无头模式: bash deploy.sh --headless --http-port 520 --game-port 23301
+#   无头模式: bash deploy.sh --headless --http-port 23300 --game-port 23301
 #
 # ============================================
 

@@ -93,7 +93,7 @@ class SetupWorker(QThread):
     progress = Signal(str, int, str)
     finished = Signal(bool, str)
     
-    def __init__(self, http_port: int = 520, game_port: int = 23301):
+    def __init__(self, http_port: int = 23300, game_port: int = 23301):
         super().__init__()
         self.http_port = http_port
         self.game_port = game_port

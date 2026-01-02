@@ -56,7 +56,7 @@ NDHSM/
 | 参数 | 说明 |
 |------|------|
 | `--headless`, `-H` | 无头模式，跳过交互 |
-| `--http-port PORT` | HTTP/MUIP 端口（默认 520） |
+| `--http-port PORT` | HTTP/MUIP 端口（默认 23300） |
 | `--game-port PORT` | 游戏端口（默认 23301） |
 | `--host HOST` | 公网地址 |
 | `--skip-firewall` | 跳过防火墙配置 |
@@ -85,7 +85,7 @@ NDHSM/
   "HttpServer": {
     "BindAddress": "0.0.0.0",
     "PublicAddress": "0.0.0.0",
-    "Port": 520,
+    "Port": 23300,
     "UseSSL": true,
     "UseFetchRemoteHotfix": false
   },

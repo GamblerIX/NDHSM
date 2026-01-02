@@ -2,8 +2,8 @@
 
 # 一、Windows 端本地服务器运行需求
 
-1. **自动配置**：实现 DanHengServer 自动本地编译，或从 GitHub 平台自动下载；自动完成 DanHengServerResources 资源文件的放置（克隆至 DanHengServer 目录下，并重命名为 Resources）；将 Config.json 自动配置为 127.0.0.1 对应的 520 端口与 23301 端口。
-2. **指令器开发**：通过连接 127.0.0.1:520 端口，并读取 Config.json 中存储的 DanHengServer 管理密钥，基于 PySide6 Fluent 框架开发美观易用的 GUI 页面，支持在页面内执行相关命令。
+1. **自动配置**：实现 DanHengServer 自动本地编译，或从 GitHub 平台自动下载；自动完成 DanHengServerResources 资源文件的放置（克隆至 DanHengServer 目录下，并重命名为 Resources）；将 Config.json 自动配置为 127.0.0.1 对应的 23300 端口与 23301 端口。
+2. **指令器开发**：通过连接 127.0.0.1:23300 端口，并读取 Config.json 中存储的 DanHengServer 管理密钥，基于 PySide6 Fluent 框架开发美观易用的 GUI 页面，支持在页面内执行相关命令。
 3. **Proxy 调用**：调用 DanHengProxy 并启用无头模式与静默模式，实现客户端请求的重定向功能。
 
 # 二、Linux Debian 13 端全自动脚本需求

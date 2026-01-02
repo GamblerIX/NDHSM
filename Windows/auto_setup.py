@@ -270,7 +270,7 @@ class AutoSetup:
             return success
     
     def setup_config(self, 
-                     http_port: int = 520, 
+                     http_port: int = 23300, 
                      game_port: int = 23301,
                      host: str = "127.0.0.1") -> bool:
         """
@@ -312,7 +312,7 @@ class AutoSetup:
             return False
     
     def run_full_setup(self, 
-                       http_port: int = 520, 
+                       http_port: int = 23300, 
                        game_port: int = 23301,
                        host: str = "127.0.0.1") -> Tuple[bool, str]:
         """

@@ -20,7 +20,7 @@ from typing import Optional, Dict, Any
 # ============================================
 
 # 默认端口配置
-DEFAULT_HTTP_PORT = 520          # WebServer/MUIP API 端口 (需求文档中提到520)
+DEFAULT_HTTP_PORT = 23300        # WebServer/MUIP API 端口
 DEFAULT_GAME_PORT = 23301        # GameServer 端口
 DEFAULT_HOST = "127.0.0.1"       # 默认本地地址
 

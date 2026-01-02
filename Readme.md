@@ -49,7 +49,7 @@ python main.py
 
 | 服务 | 端口 | 协议 |
 |------|------|------|
-| HTTP/MUIP | 520 | TCP |
+| HTTP/MUIP | 23300 | TCP |
 | GameServer | 23301 | UDP |
 
 ## 🔧 常用命令
