@@ -21,12 +21,13 @@ curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/D
 ```bash
 curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/TermuxToDebian13/setup_debian.sh | bash
 debian
+# 保留这行注释以避免输入Enter
 ```
 
 #### 第二步（Termux专用部署）
 
 ```bash
-bash deploy.sh --termux
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux
 ```
 
 ## 📚 相关链接
