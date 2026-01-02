@@ -44,7 +44,7 @@ NDHSM/
 ### deploy.sh 部署流程
 
 1. **安装依赖** - curl, wget, git, screen, jq
-2. **下载服务器** - 从 Gitee/GitHub Releases 获取自包含版本
+2. **下载服务器** - 从 GitHub Releases 获取自包含版本
 3. **克隆资源文件** - DanHengServerResources
 4. **创建 dh 用户** - 设置可执行权限
 5. **配置防火墙** - 开放服务端口 (可选)
@@ -56,7 +56,6 @@ NDHSM/
 | 参数 | 说明 |
 |------|------|
 | `--headless`, `-H` | 无头模式，跳过交互 |
-| `--gitee` | 使用 Gitee 镜像加速 |
 | `--http-port PORT` | HTTP/MUIP 端口（默认 520） |
 | `--game-port PORT` | 游戏端口（默认 23301） |
 | `--host HOST` | 公网地址 |

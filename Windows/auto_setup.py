@@ -22,8 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from config import (
     get_app_dir, get_server_dir, get_resources_dir, get_proxy_dir,
     get_config_path, get_default_config, save_config, load_config,
-    GITHUB_SERVER_REPO, GITHUB_RESOURCES_REPO, GITHUB_PROXY_REPO,
-    GITEE_SERVER_REPO, GITEE_RESOURCES_REPO, GITEE_PROXY_REPO
+    GITHUB_SERVER_REPO, GITHUB_RESOURCES_REPO, GITHUB_PROXY_REPO
 )
 
 # ============================================
@@ -123,26 +122,19 @@ class AutoSetup:
     负责 DanHeng 环境的自动部署和配置
     """
     
-    def __init__(self, use_gitee: bool = False, progress: ProgressCallback = default_progress):
+    def __init__(self, progress: ProgressCallback = default_progress):
         """
         初始化自动配置器
         
         Args:
-            use_gitee: 是否使用 Gitee（国内镜像）
             progress: 进度回调函数
         """
-        self.use_gitee = use_gitee
         self.progress = progress
         
-        # 选择仓库源
-        if use_gitee:
-            self.server_repo = GITEE_SERVER_REPO
-            self.resources_repo = GITEE_RESOURCES_REPO
-            self.proxy_repo = GITEE_PROXY_REPO
-        else:
-            self.server_repo = GITHUB_SERVER_REPO
-            self.resources_repo = GITHUB_RESOURCES_REPO
-            self.proxy_repo = GITHUB_PROXY_REPO
+        # 使用 GitHub 仓库
+        self.server_repo = GITHUB_SERVER_REPO
+        self.resources_repo = GITHUB_RESOURCES_REPO
+        self.proxy_repo = GITHUB_PROXY_REPO
     
     def check_environment(self) -> Tuple[bool, str]:
         """
@@ -353,12 +345,11 @@ class AutoSetup:
 # 便捷函数
 # ============================================
 
-def quick_setup(use_gitee: bool = False, 
-                progress: ProgressCallback = default_progress) -> Tuple[bool, str]:
+def quick_setup(progress: ProgressCallback = default_progress) -> Tuple[bool, str]:
     """
     快速配置（使用默认参数）
     """
-    setup = AutoSetup(use_gitee=use_gitee, progress=progress)
+    setup = AutoSetup(progress=progress)
     return setup.run_full_setup()
 
 
@@ -368,8 +359,7 @@ if __name__ == "__main__":
     print("NDHSM 自动配置工具")
     print("=" * 50)
     
-    use_gitee = "--gitee" in sys.argv
-    success, msg = quick_setup(use_gitee=use_gitee)
+    success, msg = quick_setup()
     
     print("=" * 50)
     print(f"结果: {'成功' if success else '失败'}")

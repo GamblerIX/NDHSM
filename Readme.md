@@ -7,31 +7,23 @@
 ### Linux Debian 13
 
 ```bash
-# GitHub 源
 curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash
-
-# Gitee 源（国内推荐）
-curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | bash
 ```
 
 **无头模式（跳过交互）：**
 ```bash
-curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless --gitee
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless
 ```
 
 **手动设置 GC 内存限制（Termux 推荐）：**
 ```bash
-curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless --gitee --gc-limit 128
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash -s -- --headless --gc-limit 128
 ```
 
 ### Termux (Android)
 
 ```bash
-# GitHub 源
 curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/TermuxToDebian13/setup_debian.sh | bash
-
-# Gitee 源（国内推荐）
-curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/TermuxToDebian13/setup_debian.sh | bash
 ```
 
 安装完成后，输入 `debian` 进入 Debian 环境，然后运行上方的 Linux 部署命令。

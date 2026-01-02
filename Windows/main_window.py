@@ -93,9 +93,8 @@ class SetupWorker(QThread):
     progress = Signal(str, int, str)
     finished = Signal(bool, str)
     
-    def __init__(self, use_gitee: bool = False, http_port: int = 520, game_port: int = 23301):
+    def __init__(self, http_port: int = 520, game_port: int = 23301):
         super().__init__()
-        self.use_gitee = use_gitee
         self.http_port = http_port
         self.game_port = game_port
     
@@ -103,7 +102,7 @@ class SetupWorker(QThread):
         def progress_callback(stage, percent, msg):
             self.progress.emit(stage, percent, msg)
         
-        setup = AutoSetup(use_gitee=self.use_gitee, progress=progress_callback)
+        setup = AutoSetup(progress=progress_callback)
         success, msg = setup.run_full_setup(
             http_port=self.http_port,
             game_port=self.game_port
@@ -511,21 +510,6 @@ class SettingsPage(QWidget):
         
         server_card.viewLayout.addLayout(server_layout)
         layout.addWidget(server_card)
-        
-        # 数据源配置
-        source_card = HeaderCardWidget()
-        source_card.setTitle("数据源")
-        source_layout = QVBoxLayout()
-        
-        gitee_layout = QHBoxLayout()
-        gitee_layout.addWidget(BodyLabel("使用 Gitee 镜像（国内加速）:"))
-        self.gitee_switch = SwitchButton()
-        gitee_layout.addWidget(self.gitee_switch)
-        gitee_layout.addStretch()
-        source_layout.addLayout(gitee_layout)
-        
-        source_card.viewLayout.addLayout(source_layout)
-        layout.addWidget(source_card)
         
         # 保存按钮
         btn_layout = QHBoxLayout()

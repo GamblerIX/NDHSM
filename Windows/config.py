@@ -24,14 +24,10 @@ DEFAULT_HTTP_PORT = 520          # WebServer/MUIP API 端口 (需求文档中提
 DEFAULT_GAME_PORT = 23301        # GameServer 端口
 DEFAULT_HOST = "127.0.0.1"       # 默认本地地址
 
-# GitHub/Gitee 仓库地址
+# GitHub 仓库地址
 GITHUB_SERVER_REPO = "https://github.com/GamblerIX/DanHengServer.git"
 GITHUB_RESOURCES_REPO = "https://github.com/GamblerIX/DanHengServerResources.git"
 GITHUB_PROXY_REPO = "https://github.com/GamblerIX/DanHengProxy.git"
-
-GITEE_SERVER_REPO = "https://gitee.com/GamblerIX/DanHengServer.git"
-GITEE_RESOURCES_REPO = "https://gitee.com/GamblerIX/DanHengServerResources.git"
-GITEE_PROXY_REPO = "https://gitee.com/GamblerIX/DanHengProxy.git"
 
 # 应用信息
 APP_NAME = "NDHSM"

@@ -6,7 +6,7 @@
 #
 # 功能说明:
 # 1. 自动安装系统依赖
-# 2. 从 GitHub/Gitee 下载自包含版本服务器
+# 2. 从 GitHub 下载自包含版本服务器
 # 3. 克隆资源文件
 # 4. 创建 dh 用户并配置权限
 # 5. 配置防火墙
@@ -34,9 +34,7 @@ SERVICE_USER="dh"
 
 # 仓库地址
 GITHUB_SERVER_RELEASES="https://api.github.com/repos/GamblerIX/DanHengServer/releases/latest"
-GITEE_SERVER_RELEASES="https://gitee.com/api/v5/repos/GamblerIX/DanHengServer/releases/latest"
 GITHUB_RESOURCES_REPO="https://github.com/GamblerIX/DanHengServerResources.git"
-GITEE_RESOURCES_REPO="https://gitee.com/GamblerIX/DanHengServerResources.git"
 
 # 中科大镜像
 USTC_DOTNET_FEED="https://mirrors.ustc.edu.cn/dotnet"
@@ -120,7 +118,6 @@ detect_arch() {
 # ============================================
 
 HEADLESS=false
-USE_GITEE=false
 HTTP_PORT=$DEFAULT_HTTP_PORT
 GAME_PORT=$DEFAULT_GAME_PORT
 PUBLIC_HOST=$DEFAULT_HOST
@@ -133,10 +130,6 @@ parse_args() {
         case $1 in
             --headless|-H)
                 HEADLESS=true
-                shift
-                ;;
-            --gitee)
-                USE_GITEE=true
                 shift
                 ;;
             --http-port)
@@ -184,7 +177,6 @@ NDHSM Linux Debian 13 全自动部署脚本
 
 选项:
   --headless, -H      无头模式，跳过交互
-  --gitee             使用 Gitee 镜像（国内加速）
   --http-port PORT    HTTP/MUIP 端口（默认: $DEFAULT_HTTP_PORT）
   --game-port PORT    游戏服务器端口（默认: $DEFAULT_GAME_PORT）
   --host HOST         公网地址（默认: $DEFAULT_HOST）
@@ -199,9 +191,6 @@ NDHSM Linux Debian 13 全自动部署脚本
 
   # 无头模式
   bash deploy.sh --headless --http-port 443 --game-port 23301
-
-  # 使用 Gitee 镜像
-  bash deploy.sh --headless --gitee
 EOF
 }
 
@@ -328,20 +317,12 @@ download_server() {
         echo "$url"
     }
 
-    # 1. 优先尝试 Gitee
-    if [ "$download_url" == "" ] || [ "$download_url" == "null" ]; then
-        download_url=$(get_download_url "$GITEE_SERVER_RELEASES" "Gitee")
-    fi
-
-    # 2. 如果失败，尝试 GitHub
-    if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
-        log_warning "Gitee 获取失败或未找到 Release，尝试 GitHub..."
-        download_url=$(get_download_url "$GITHUB_SERVER_RELEASES" "GitHub")
-    fi
+    # 从 GitHub 获取下载链接
+    download_url=$(get_download_url "$GITHUB_SERVER_RELEASES" "GitHub")
     
-    # 3. 最终检查
+    # 检查是否成功
     if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
-        log_error "未找到适用的下载包 (Gitee 和 GitHub 均失败)"
+        log_error "未找到适用的下载包"
         log_info "请手动下载 Release 包并解压到: $INSTALL_DIR"
         exit 1
     fi
@@ -405,11 +386,6 @@ clone_resources() {
     fi
     
     local repo_url="$GITHUB_RESOURCES_REPO"
-    
-    # 资源仓库目前仅支持 GitHub (Gitee 需要鉴权)
-    if [ "$USE_GITEE" = true ]; then
-        log_info "注意: 资源文件将从 GitHub 克隆 (Gitee 镜像需鉴权)"
-    fi
     
     log_info "正在克隆资源仓库..."
     git clone --depth 1 "$repo_url" "$resources_dir"

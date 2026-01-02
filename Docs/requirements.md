@@ -2,13 +2,13 @@
 
 # 一、Windows 端本地服务器运行需求
 
-1. **自动配置**：实现 DanHengServer 自动本地编译，或从 GitHub/Gitee 平台自动下载；自动完成 DanHengServerResources 资源文件的放置（克隆至 DanHengServer 目录下，并重命名为 Resources）；将 Config.json 自动配置为 127.0.0.1 对应的 520 端口与 23301 端口。
+1. **自动配置**：实现 DanHengServer 自动本地编译，或从 GitHub 平台自动下载；自动完成 DanHengServerResources 资源文件的放置（克隆至 DanHengServer 目录下，并重命名为 Resources）；将 Config.json 自动配置为 127.0.0.1 对应的 520 端口与 23301 端口。
 2. **指令器开发**：通过连接 127.0.0.1:520 端口，并读取 Config.json 中存储的 DanHengServer 管理密钥，基于 PySide6 Fluent 框架开发美观易用的 GUI 页面，支持在页面内执行相关命令。
 3. **Proxy 调用**：调用 DanHengProxy 并启用无头模式与静默模式，实现客户端请求的重定向功能。
 
 # 二、Linux Debian 13 端全自动脚本需求
 
-1. 自动安装或更新所需运行环境（设置中科大源），从 Gitee(同步自Github) 或 GitHub 自动匹配硬件架构，下载 Releases 中的最新版本压缩包，并完成自动解压部署。
+1. 自动安装或更新所需运行环境（设置中科大源），从 GitHub 自动匹配硬件架构，下载 Releases 中的最新版本压缩包，并完成自动解压部署。
 2. 将 DanHengServerResources 资源文件克隆至 DanHengServer 目录下，并重命名为 Resources。
 3. 提供交互式配置功能，引导用户完成 Config.json 的参数设置。
 4. 创建 dh 用户，以 root 身份配置应用归属为 dh 用户，并设置 755 权限。
@@ -24,5 +24,4 @@
 1. 通过 proot-distro 工具自动安装 Debian 13 系统。
 2. 添加快捷启动指令“debian”，输入该指令即可一键启动 Debian 13 系统。
 
-https://github/GamblerIX/DanHeng.git
-https://gitee/GamblerIX/DanHeng.git（未完成开发，暂未推送。我会手动同步。）
+https://github.com/GamblerIX/DanHeng.git

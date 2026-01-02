@@ -233,7 +233,7 @@ main() {
     echo -e "后续步骤:"
     echo -e "  1. 输入 '${YELLOW}${SHORTCUT_NAME}${NC}' 进入 Debian 环境"
     echo -e "  2. 运行 DanHeng 部署脚本:"
-    echo -e "     ${YELLOW}curl -sSL https://gitee.com/GamblerIX/DanHeng/raw/main/NDHSM/Linux/Debian13/deploy.sh | bash${NC}"
+    echo -e "     ${YELLOW}curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/Debian13/deploy.sh | bash${NC}"
     echo ""
 }
 

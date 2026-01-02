@@ -28,8 +28,7 @@ def main():
         if arg in ("--setup", "-s"):
             # 仅运行自动配置
             from auto_setup import quick_setup
-            use_gitee = "--gitee" in sys.argv
-            success, msg = quick_setup(use_gitee=use_gitee)
+            success, msg = quick_setup()
             print(f"\n结果: {'成功' if success else '失败'}")
             print(f"消息: {msg}")
             return 0 if success else 1
@@ -38,7 +37,6 @@ def main():
             print(__doc__)
             print("参数:")
             print("  --setup, -s   仅运行自动配置")
-            print("  --gitee       使用 Gitee 镜像")
             print("  --help, -h    显示帮助信息")
             return 0
     
