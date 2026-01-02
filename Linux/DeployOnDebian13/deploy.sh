@@ -170,7 +170,6 @@ parse_args() {
             --termux)
                 TERMUX_MODE=true
                 HEADLESS=true  # Termux 模式强制无头
-                ENABLE_GH_PROXY=true  # Termux 模式自动开启加速
                 # Termux 模式下，如果不指定 GC 限制，则默认为 128
                 [ -z "$GC_LIMIT" ] && GC_LIMIT=128
                 shift

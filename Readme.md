@@ -21,7 +21,7 @@ curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/D
 
 **Termux 一键部署**
 
-> Termux 部署方式始终使用国内加速网络。
+> 由于 Termux 环境网络波动较大，建议根据实际情况手动选择是否开启加速代理。
 
 #### 第一步（安装 Debian）
 ```bash
@@ -33,11 +33,15 @@ debian
 #### 第二步（Termux专用部署）
 
 ```bash
-# 自动竞速最优节点
-curl -sSL https://gh-proxy.org/https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux
+# 默认部署（直连）
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux
+# 保留这行注释以避免输入Enter
+```
 
-# 若特定节点不稳定，可强制指定常用代理
-curl -sSL https://gh-proxy.org/https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux --ghproxyset https://ghproxy.net/
+```bash
+# 开启加速代理部署（国内推荐，但是Termux下疑似存在BUG，建议谨慎使用）
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux --gh-proxy
+# 保留这行注释以避免输入Enter
 ```
 
 ## 📚 相关链接
