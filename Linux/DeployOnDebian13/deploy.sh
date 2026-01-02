@@ -102,6 +102,7 @@ check_root() {
     fi
 }
 
+# 获取架构
 detect_arch() {
     local arch=$(uname -m)
     case $arch in
@@ -116,23 +117,6 @@ detect_arch() {
             exit 1
             ;;
     esac
-}
-
-# 获取代理列表工具函数
-get_effective_proxies() {
-    if [ "$ENABLE_GH_PROXY" = false ]; then
-        echo ""
-        return
-    fi
-    if [ -n "$FORCED_PROXY" ]; then
-        echo "$FORCED_PROXY"
-        return
-    fi
-    # 返回所有预设代理，最后尝试直连 ("")
-    for p in "${GITHUB_PROXIES[@]}"; do
-        echo "$p"
-    done
-    echo ""
 }
 
 # ============================================
@@ -342,29 +326,49 @@ download_server() {
         local api_url="$1"
         local source_name="$2"
         
-        local proxies
-        proxies=$(get_effective_proxies)
+        # 构建代理尝试列表
+        local try_list=()
+        if [ -n "$FORCED_PROXY" ]; then
+            try_list=("$FORCED_PROXY")
+        elif [ "$ENABLE_GH_PROXY" = true ]; then
+            try_list=("${GITHUB_PROXIES[@]}" "") # 代理列表 + 直连保底
+        else
+            try_list=("") # 仅直连
+        fi
         
-        for proxy in $proxies; do
+        log_info "将尝试 ${#try_list[@]} 个连接端点..." >&2
+
+        for proxy in "${try_list[@]}"; do
             local final_api_url="${proxy}${api_url}"
-            [ -n "$proxy" ] && log_info "尝试通过代理获取版本信息: $proxy" >&2 || log_info "尝试直连获取版本信息..." >&2
+            local prefix_info="直连"
+            [ -n "$proxy" ] && prefix_info="代理 $proxy"
+            
+            log_info "正在尝试获取版本信息 ($prefix_info)..." >&2
 
             local release_info
-            if release_info=$(curl -sSL --connect-timeout 10 "$final_api_url" 2>/dev/null); then
+            # 增加 -v 以便在极端情况下调试 (当前仅保留 -sSL)
+            if release_info=$(curl -sSL --connect-timeout 10 --retry 2 "$final_api_url" 2>/dev/null); then
+                # 简单验证 JSON合法性
                 if [ -n "$release_info" ] && [ "$release_info" != "null" ] && echo "$release_info" | jq . >/dev/null 2>&1; then
-                    # 尝试匹配架构 (仅下载 self-contained 版本)
+                    # 尝试匹配架构
                     local url
                     url=$(echo "$release_info" | jq -r ".assets[] | select(.name | contains(\"$arch\") and contains(\"self-contained\")) | .browser_download_url" 2>/dev/null | head -1)
                     if [ -n "$url" ] && [ "$url" != "null" ]; then
                         echo "$url"
                         return 0
+                    else
+                        log_warning "API 请求成功但未能在 JSON 中找到对应架构 ($arch) 的资源" >&2
                     fi
+                else
+                    log_warning "API 返回内容无效或非 JSON 格式" >&2
                 fi
+            else
+                 log_warning "连接失败 ($prefix_info)" >&2
             fi
             
             # 如果是强制代理模式且失败了，直接报错
             if [ -n "$FORCED_PROXY" ]; then
-                log_error "强制指定的代理无法获取 API 信息" >&2
+                log_error "强制指定的代理无法获取 API 信息，请检查代理地址或网络" >&2
                 return 1
             fi
         done
@@ -385,12 +389,23 @@ download_server() {
     # 下载执行
     filename=$(basename "$download_url")
     local success=false
-    local proxies
-    proxies=$(get_effective_proxies)
+    
+    # 构建代理尝试列表
+    local try_list=()
+    if [ -n "$FORCED_PROXY" ]; then
+        try_list=("$FORCED_PROXY")
+    elif [ "$ENABLE_GH_PROXY" = true ]; then
+        try_list=("${GITHUB_PROXIES[@]}" "") 
+    else
+        try_list=("") 
+    fi
 
-    for proxy in $proxies; do
+    for proxy in "${try_list[@]}"; do
         local final_url="${proxy}${download_url}"
-        [ -n "$proxy" ] && log_info "尝试通过代理下载: $proxy" || log_info "尝试直连下载..."
+        local prefix_info="直连"
+        [ -n "$proxy" ] && prefix_info="代理 $proxy"
+
+        log_info "正在尝试下载文件 ($prefix_info)..."
         
         if wget --show-progress -O "$filename" "$final_url"; then
             success=true
@@ -399,6 +414,7 @@ download_server() {
 
         if [ -n "$FORCED_PROXY" ]; then
             log_error "强制指定的代理下载失败"
+            rm -f "$filename"
             exit 1
         fi
         log_warning "当前节点下载失败，尝试下一个..."
@@ -463,12 +479,23 @@ clone_resources() {
     
     local repo_url="$GITHUB_RESOURCES_REPO"
     local success=false
-    local proxies
-    proxies=$(get_effective_proxies)
+    
+    # 构建代理尝试列表
+    local try_list=()
+    if [ -n "$FORCED_PROXY" ]; then
+        try_list=("$FORCED_PROXY")
+    elif [ "$ENABLE_GH_PROXY" = true ]; then
+        try_list=("${GITHUB_PROXIES[@]}" "")
+    else
+        try_list=("")
+    fi
 
-    for proxy in $proxies; do
+    for proxy in "${try_list[@]}"; do
         local final_repo="${proxy}${repo_url}"
-        [ -n "$proxy" ] && log_info "尝试通过代理克隆资源: $proxy" || log_info "尝试直连克隆资源..."
+        local prefix_info="直连"
+        [ -n "$proxy" ] && prefix_info="代理 $proxy"
+
+        log_info "正在尝试克隆仓库 ($prefix_info)..."
         
         if git clone --depth 1 "$final_repo" "$resources_dir"; then
             success=true
