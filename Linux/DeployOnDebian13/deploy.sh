@@ -1,13 +1,14 @@
-#!/bin/bash
 # ============================================
 # NDHSM Linux DeployOnDebian13 全自动部署脚本
-# 相关文件: ../TermuxToDebian13/setup_debian.sh
+# 相关文件:
+#   - ../TermuxToDebian13/setup_debian.sh (Termux 环境初始化)
+#   - ../../Readme.md (项目主说明文档)
 # ============================================
 #
 # 功能说明:
 # 1. 自动安装系统依赖
-# 2. 从 GitHub 下载自包含版本服务器
-# 3. 克隆资源文件
+# 2. 从 GitHub 下载自包含版本服务器 (支持代理)
+# 3. 克隆资源文件 (支持代理)
 # 4. 配置防火墙 (可选，需 root)
 # 5. 后台运行并自动生成/配置 Config.json
 #
@@ -34,8 +35,12 @@ GITHUB_RESOURCES_REPO="https://github.com/GamblerIX/DanHengServerResources.git"
 
 # GitHub 加速代理
 GITHUB_PROXIES=(
+    "https://ghps.cc/"
     "https://gh-proxy.org/"
     "https://gh.xmly.dev/"
+    "http://gh.halonice.com/"
+    "https://proxy.gitwarp.com/"
+    "https://gh.zwnes.xyz/"
 )
 ENABLE_GH_PROXY=false
 SELECTED_PROXY=""
@@ -112,22 +117,42 @@ detect_arch() {
     esac
 }
 
-# 选择并检测 Github 代理
+# 选择带宽吞吐量最高的 Github 代理
 select_github_proxy() {
     if [ "$ENABLE_GH_PROXY" = false ]; then
         return 0
     fi
     
-    log_info "正在检测可用加速代理..."
+    log_info "正在对可用加速代理进行带宽竞速测试..."
+    local max_speed=0
+    local best_proxy=""
+    
     for proxy in "${GITHUB_PROXIES[@]}"; do
-        # 简单通过 HEAD 请求测试代理连通性
-        if curl -sSL --connect-timeout 5 -I "$proxy" &>/dev/null; then
-            SELECTED_PROXY="$proxy"
-            log_success "已选择加速代理: $SELECTED_PROXY"
-            return 0
+        # 测速：尝试拉取代理主页或小文件，记录下载速度 (bytes/sec)
+        # --max-time 3 防止单个节点卡死下载过程
+        # 使用 cut 处理浮点数取整数部分，方便在 shell 中进行比较
+        local speed=$(curl -sL --connect-timeout 3 --max-time 4 -o /dev/null -w "%{speed_download}" "$proxy" 2>/dev/null | cut -d'.' -f1 || echo 0)
+        
+        local speed_kb=$((speed / 1024))
+        log_info "-> 节点: $proxy | 估算带宽: ${speed_kb} KB/s" >&2
+
+        if [ "$speed" -gt "$max_speed" ]; then
+            max_speed=$speed
+            best_proxy=$proxy
         fi
     done
-    log_warning "未找到可用的加速代理，将使用原始地址"
+
+    if [ -n "$best_proxy" ] && [ "$max_speed" -gt 0 ]; then
+        SELECTED_PROXY="$best_proxy"
+        local final_speed_kb=$((max_speed / 1024))
+        log_success "竞速完成！已选择最优带宽代理: $SELECTED_PROXY (峰值约 ${final_speed_kb} KB/s)"
+    elif [ "$TERMUX_MODE" = true ]; then
+        # Termux 下如果全挂了，往往是本地 DNS 或出口受限，强制选第一个作为尝试
+        SELECTED_PROXY="${GITHUB_PROXIES[0]}"
+        log_warning "所有代理测速响应异常，但在 Termux 模式下将强制尝试首选代理: $SELECTED_PROXY"
+    else
+        log_warning "未能检测到有效带宽的代理，将尝试直连模式"
+    fi
 }
 
 # ============================================
@@ -334,14 +359,29 @@ download_server() {
         
         log_info "正在尝试从 $source_name 获取版本信息..." >&2
         
-        local release_info
-        if ! release_info=$(curl -sSL --connect-timeout 10 "$api_url" 2>/dev/null); then
-            log_warning "无法连接到 $source_name API" >&2
-            return 1
+        local final_api_url="$api_url"
+        if [ -n "$SELECTED_PROXY" ]; then
+            final_api_url="${SELECTED_PROXY}${api_url}"
+            log_info "使用加速代理访问 API..." >&2
         fi
 
-        if [ -z "$release_info" ]; then
-             log_warning "$source_name API 返回为空" >&2
+        local release_info
+        if ! release_info=$(curl -sSL --connect-timeout 10 "$final_api_url" 2>/dev/null); then
+            log_warning "无法通过当前连接获取 $source_name API 信息" >&2
+            
+            # 如果刚才用了代理，尝试回退到直连作为保底
+            if [ -n "$SELECTED_PROXY" ]; then
+                log_info "尝试直连访问 API..." >&2
+                if ! release_info=$(curl -sSL --connect-timeout 10 "$api_url" 2>/dev/null); then
+                    return 1
+                fi
+            else
+                return 1
+            fi
+        fi
+
+        if [ -z "$release_info" ] || [ "$release_info" == "null" ]; then
+             log_warning "$source_name API 返回数据无效" >&2
              return 1
         fi
         
@@ -357,7 +397,8 @@ download_server() {
     
     # 检查是否成功
     if [ -z "$download_url" ] || [ "$download_url" == "null" ]; then
-        log_error "未找到适用的下载包，这不是您的问题，请在Github上提交Issue"
+        log_error "未找到适用的下载包，这通常是由于网络无法连接到 GitHub API 导致的。"
+        log_error "请检查您的网络连接，或尝试多次运行脚本。"
         exit 1
     fi
     
