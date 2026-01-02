@@ -35,8 +35,8 @@ GITHUB_RESOURCES_REPO="https://github.com/GamblerIX/DanHengServerResources.git"
 
 # GitHub 加速代理
 GITHUB_PROXIES=(
-    "https://ghps.cc/"
     "https://gh-proxy.org/"
+    "https://ghproxy.net/"
     "https://gh.xmly.dev/"
     "http://gh.halonice.com/"
     "https://proxy.gitwarp.com/"
@@ -44,6 +44,7 @@ GITHUB_PROXIES=(
 )
 ENABLE_GH_PROXY=false
 SELECTED_PROXY=""
+FORCED_PROXY="" # 强制指定的代理
 
 # 颜色定义
 RED='\033[0;31m'
@@ -123,15 +124,38 @@ select_github_proxy() {
         return 0
     fi
     
-    log_info "正在对可用加速代理进行带宽竞速测试..."
+    local test_url="https://github.com/GamblerIX/DanHengProxy/releases/download/v2.3.1/DanHengProxy_win-x64_v2.3.1.zip"
+    
+    # 如果强制指定了代理
+    if [ -n "$FORCED_PROXY" ]; then
+        log_info "正在检测强制指定的代理: $FORCED_PROXY"
+        local final_test_url="${FORCED_PROXY}${test_url}"
+        
+        # 测速并真实下载一点点数据（5秒采样）
+        local speed=$(curl -sL --connect-timeout 5 --max-time 6 -o "proxy_test.tmp" -w "%{speed_download}" "$final_test_url" 2>/dev/null | cut -d'.' -f1 || echo 0)
+        rm -f "proxy_test.tmp"
+        
+        if [ "$speed" -le 0 ]; then
+            log_error "强制指定的代理无法连接或速度极慢，已终止部署"
+            exit 1
+        fi
+        
+        SELECTED_PROXY="$FORCED_PROXY"
+        log_success "强制代理检测通过！估算带宽: $((speed / 1024)) KB/s"
+        return 0
+    fi
+
+    log_info "正在对可用加速代理进行带宽竞速测试 (采样源: DanHengProxy Release)..."
     local max_speed=0
     local best_proxy=""
     
     for proxy in "${GITHUB_PROXIES[@]}"; do
-        # 测速：尝试拉取代理主页或小文件，记录下载速度 (bytes/sec)
-        # --max-time 3 防止单个节点卡死下载过程
-        # 使用 cut 处理浮点数取整数部分，方便在 shell 中进行比较
-        local speed=$(curl -sL --connect-timeout 3 --max-time 4 -o /dev/null -w "%{speed_download}" "$proxy" 2>/dev/null | cut -d'.' -f1 || echo 0)
+        # 采样真实的 GitHub Release 文件以获取更准确的带宽数据
+        local final_test_url="${proxy}${test_url}"
+        
+        # 执行 4 秒采样下载
+        local speed=$(curl -sL --connect-timeout 3 --max-time 4 -o "proxy_test.tmp" -w "%{speed_download}" "$final_test_url" 2>/dev/null | cut -d'.' -f1 || echo 0)
+        rm -f "proxy_test.tmp"
         
         local speed_kb=$((speed / 1024))
         log_info "-> 节点: $proxy | 估算带宽: ${speed_kb} KB/s" >&2
@@ -203,6 +227,11 @@ parse_args() {
                 ENABLE_GH_PROXY=true
                 shift
                 ;;
+            --ghproxyset)
+                FORCED_PROXY="$2"
+                ENABLE_GH_PROXY=true
+                shift 2
+                ;;
             --help|-h)
                 show_help
                 exit 0
@@ -238,6 +267,7 @@ NDHSM Linux DeployOnDebian13 全自动部署脚本
   --termux            Termux 优化（无头模式 + GC 限制 128MB）
   --gc-limit MB       手动设置 GC 内存限制 (单位 MB，默认自动检测)
   --gh-proxy          开启 GitHub 下载加速（自动从预设中选择）
+  --ghproxyset URL    强制指定加速代理地址 (例如 https://gh-proxy.org/ )
   --delete            彻底删除安装目录及全部数据
   --mysql             将数据库类型替换为 MySQL
   --help, -h          显示帮助信息
