@@ -28,6 +28,7 @@ debian
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux
+# 保留这行注释以避免输入Enter
 ```
 
 ## 📚 相关链接
