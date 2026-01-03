@@ -249,17 +249,21 @@ change_apt_source() {
     log_step 1 "配置 APT 源..."
     
     local sources_file="/etc/apt/sources.list"
+    local sources_dir="/etc/apt/sources.list.d"
     local backup_file="/etc/apt/sources.list.bak"
     
     # 备份原文件
     [ ! -f "$backup_file" ] && cp "$sources_file" "$backup_file"
     
+    # 清理可能冲突的源文件
+    rm -f "$sources_dir"/*.sources 2>/dev/null || true
+    
     if [ "$MIRROR_OPTION" = "1" ]; then
-        log_info "切换到阿里云镜像源..."
+        log_info "切换到阿里云镜像源（使用 HTTP 以兼容无证书环境）..."
         cat > "$sources_file" << 'EOF'
-deb https://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware
-deb https://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware
-deb https://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware
 EOF
         log_success "已切换到阿里云镜像源"
     elif [ "$MIRROR_OPTION" = "2" ]; then
@@ -271,6 +275,17 @@ deb http://security.debian.org/debian-security bookworm-security main contrib no
 EOF
         log_success "已恢复官方源"
     fi
+    
+    # 立即更新源索引
+    log_info "正在更新软件包索引..."
+    if ! apt-get update -qq 2>/dev/null; then
+        log_warning "apt-get update 遇到警告，将继续尝试..."
+        apt-get update 2>&1 | grep -i "^E:" && {
+            log_error "更新软件包索引失败，请检查网络连接"
+            exit 1
+        }
+    fi
+    log_success "软件包索引已更新"
 }
 
 # ============================================
@@ -297,9 +312,19 @@ install_dependencies() {
         return 0
     fi
 
+    # 如果未换源，先更新索引
+    if [ -z "$MIRROR_OPTION" ]; then
+        log_info "正在更新软件包索引..."
+        apt-get update -qq || log_warning "apt-get update 遇到警告"
+    fi
+
     # 执行安装
     log_info "待安装依赖: ${missing[*]}"
-    apt-get update -qq && apt-get install -y -qq "${missing[@]}"
+    if ! apt-get install -y "${missing[@]}"; then
+        log_error "依赖安装失败，请检查网络连接或软件源配置"
+        log_info "提示: 可尝试使用 --mirror1 或 --mirror2 参数切换软件源"
+        exit 1
+    fi
     
     log_success "依赖安装完成"
 }
