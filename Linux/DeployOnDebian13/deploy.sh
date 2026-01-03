@@ -663,10 +663,6 @@ EOF
         log_warning "jq 未安装，跳过配置修改 (使用默认值)"
     fi
     
-    else
-        log_warning "jq 未安装，跳过配置修改 (使用默认值)"
-    fi
-    
     log_success "配置已完成"
 }
 
