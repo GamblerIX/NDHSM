@@ -587,28 +587,45 @@ download_resources() {
 # ============================================
 
 configure_server() {
-    log_step 7 "配置 Config.json..."
+    log_step 4 "配置 Config.json..." # Updating step number contextually if needed, but keeping name simple
     
     local config_path="$INSTALL_DIR/Config.json"
-    
-    # 等待 Config.json 生成 (服务首次启动会自动创建)
-    log_info "等待配置文件生成..."
     mkdir -p "$INSTALL_DIR/Config"
-    local wait_count=0
-    while [ ! -f "$config_path" ] && [ $wait_count -lt 30 ]; do
-        sleep 1
-        wait_count=$((wait_count + 1))
-    done
-    
+
+    # 如果文件不存在，手动创建一个包含基本端口配置的文件
     if [ ! -f "$config_path" ]; then
-        log_error "Config.json 未能由服务端自动生成，部署无法继续"
-        exit 1
+        log_info "Config.json 不存在，正在创建默认配置..."
+        cat <<EOF > "$config_path"
+{
+  "HttpServer": {
+    "BindAddress": "0.0.0.0",
+    "PublicAddress": "$PUBLIC_HOST",
+    "Port": $HTTP_PORT,
+    "UseSSL": false,
+    "UseFetchRemoteHotfix": false
+  },
+  "GameServer": {
+    "BindAddress": "0.0.0.0",
+    "PublicAddress": "127.0.0.1",
+    "Port": 23301,
+    "GameServerId": "dan_heng",
+    "GameServerName": "DanhengServer",
+    "GameServerDescription": "Private Server",
+    "UsePacketEncryption": true
+  },
+  "Database": {
+    "DatabaseType": "sqlite",
+    "DatabaseName": "danheng.db"
+  }
+}
+EOF
+        log_success "默认配置文件已创建"
+    else
+        log_info "Config.json 已存在，准备修改..."
     fi
-    
-    # 停止服务
-    log_info "停止服务以修改配置..."
-    pkill -f "$INSTALL_DIR/DanhengServer" || pkill -f "$INSTALL_DIR/GameServer" || true
-    sleep 2
+ 
+    # 交互模式下询问用户
+
     
     # 交互模式下询问用户
     if [ "$HEADLESS" = false ]; then
@@ -878,10 +895,9 @@ main() {
     install_dependencies
     download_server
     download_resources
-    configure_firewall
-    start_server
     configure_server
     create_shortcut
+    configure_firewall
     
     # 清理临时文件
     rm -f "$INSTALL_DIR"/*.zip "$INSTALL_DIR"/*.tar.gz 2>/dev/null || true
