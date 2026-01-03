@@ -744,7 +744,6 @@ fi
         log_info "或者设置别名: alias DHS='$INSTALL_DIR/dhs_runner.sh'"
     fi
 }
-}
 
 # ============================================
 # 步骤 5: 配置防火墙
