@@ -55,7 +55,7 @@ DHS
 | `--termux` | Termux 优化模式 |
 | `--http-port PORT` | 提示用户配置端口（仅提示，不再自动修改文件） |
 | `--gc-limit MB` | 手动设置 GC 内存限制 |
-| `--mysql` | 启用 MySQL 模式（在启动指令中注入环境变量覆盖配置） |
+| `--mysql` | 启用 MySQL 模式（在启动指令中修改 Config.json） |
 | `--delete` | 彻底删除安装目录及全部数据 |
 
 ## 📚 相关链接

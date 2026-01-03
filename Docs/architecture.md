@@ -37,7 +37,7 @@ NDHSM/
 | `--gc-limit MB` | 手动设置 .NET GC 堆内存上限（单位 MB） |
 | `--mirror1` | 切换 APT 源为阿里云镜像（国内推荐） |
 | `--mirror2` | 切换 APT 源为官方源 |
-| `--mysql` | 启用 MySQL 模式（在 `DHS` 启动指令中注入环境变量覆盖配置） |
+| `--mysql` | 启用 MySQL 模式（在 `DHS` 启动指令中修改 Config.json） |
 
 
 ## 📱 Termux 环境

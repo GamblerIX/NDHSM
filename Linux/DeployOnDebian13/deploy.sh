@@ -560,12 +560,36 @@ INSTALL_DIR=\"$INSTALL_DIR\"
 GC_LIMIT=\"$GC_LIMIT\"
 USE_MYSQL=\"$USE_MYSQL\"
 
-# 数据库覆盖环境变量 (仅当指定 --mysql 时生效)
+# MySQL 模式：直接修改 Config.json
 if [ \"\$USE_MYSQL\" = \"true\" ]; then
-    # 通过环境变量覆盖 .NET 配置 (Database:DatabaseType)
-    # 注意: 具体生效依赖于服务端是否支持读取环境变量覆盖配置
-    export Database__DatabaseType=\"mysql\"
+    CONFIG_FILE=\"\$INSTALL_DIR/Config.json\"
+    if [ -f \"\$CONFIG_FILE\" ]; then
+        # 简单检查是否已经是 mysql 配置，避免重复修改
+        if ! grep -q '\"DatabaseType\": \"mysql\"' \"\$CONFIG_FILE\"; then
+            echo \"正在切换数据库配置为 MySQL...\"
+            if command -v jq &>/dev/null; then
+                 # 使用 jq 安全更新配置
+                 tmp_config=\$(mktemp)
+                 jq '.Database = {
+                    \"DatabaseType\": \"mysql\",
+                    \"DatabaseName\": \"danheng\",
+                    \"MySqlHost\": \"127.0.0.1\",
+                    \"MySqlPort\": 3306,
+                    \"MySqlUser\": \"root\",
+                    \"MySqlPassword\": \"123456\",
+                    \"MySqlDatabase\": \"danheng\"
+                 }' \"\$CONFIG_FILE\" > \"\$tmp_config\" && mv \"\$tmp_config\" \"\$CONFIG_FILE\"
+                 echo \"Config.json 已更新为 MySQL 模式\"
+                 echo \"请注意：请务必检查 Config.json 中的 MySQL 连接信息是否正确！\"
+            else
+                 # 简易 sed 替换 (如果 jq 不存在)
+                 sed -i 's/\"DatabaseType\": \"sqlite\"/\"DatabaseType\": \"mysql\"/' \"\$CONFIG_FILE\"
+                 echo \"警告: jq 未安装，仅简单修改了 DatabaseType，可能需要手动补充 MySqlHost 等字段！\"
+            fi
+        fi
+    fi
 fi
+
 
 # 自动计算 GC (如果未指定)
 if [ -z \"\$GC_LIMIT\" ]; then
