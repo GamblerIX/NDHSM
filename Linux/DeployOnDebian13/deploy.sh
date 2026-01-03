@@ -252,27 +252,58 @@ change_apt_source() {
     local sources_dir="/etc/apt/sources.list.d"
     local backup_file="/etc/apt/sources.list.bak"
     
+    # 自动检测 Debian 版本代号
+    local codename
+    if [ -f /etc/os-release ]; then
+        codename=$(grep "^VERSION_CODENAME=" /etc/os-release | cut -d= -f2)
+    fi
+    
+    # 如果无法检测，默认使用 trixie (Debian 13)
+    if [ -z "$codename" ]; then
+        codename="trixie"
+        log_warning "无法检测 Debian 版本，默认使用 $codename"
+    else
+        log_info "检测到 Debian 版本: $codename"
+    fi
+    
     # 备份原文件
     [ ! -f "$backup_file" ] && cp "$sources_file" "$backup_file"
     
     # 清理可能冲突的源文件
     rm -f "$sources_dir"/*.sources 2>/dev/null || true
+    rm -f "$sources_dir"/*.list 2>/dev/null || true
     
     if [ "$MIRROR_OPTION" = "1" ]; then
         log_info "切换到阿里云镜像源（使用 HTTP 以兼容无证书环境）..."
-        cat > "$sources_file" << 'EOF'
-deb http://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware
-deb http://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware
-deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware
+        if [ "$codename" = "trixie" ] || [ "$codename" = "sid" ]; then
+            # Debian 13 (Trixie) / Sid - 无 security 仓库分离
+            cat > "$sources_file" << EOF
+deb http://mirrors.aliyun.com/debian/ $codename main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian/ $codename-updates main contrib non-free non-free-firmware
 EOF
+        else
+            # Debian 12 (Bookworm) 及更早版本
+            cat > "$sources_file" << EOF
+deb http://mirrors.aliyun.com/debian/ $codename main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian/ $codename-updates main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian-security $codename-security main contrib non-free non-free-firmware
+EOF
+        fi
         log_success "已切换到阿里云镜像源"
     elif [ "$MIRROR_OPTION" = "2" ]; then
         log_info "恢复官方源..."
-        cat > "$sources_file" << 'EOF'
-deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
-deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
-deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+        if [ "$codename" = "trixie" ] || [ "$codename" = "sid" ]; then
+            cat > "$sources_file" << EOF
+deb http://deb.debian.org/debian $codename main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian $codename-updates main contrib non-free non-free-firmware
 EOF
+        else
+            cat > "$sources_file" << EOF
+deb http://deb.debian.org/debian $codename main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian $codename-updates main contrib non-free non-free-firmware
+deb http://security.debian.org/debian-security $codename-security main contrib non-free non-free-firmware
+EOF
+        fi
         log_success "已恢复官方源"
     fi
     
