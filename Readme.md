@@ -44,6 +44,22 @@ curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/D
 # 保留这行注释以避免输入Enter
 ```
 
+## 🎮 启动与管理
+
+部署完成后，你可以使用系统快捷指令 `DHS` 来启动服务。
+
+```bash
+DHS
+```
+
+该命令会：
+1. 自动计算并配置 .NET GC 限制（针对低内存环境优化）。
+2. 在前台启动 DanHengServer（方便查看实时日志和调试）。
+
+**注意**:
+- 根据最新的部署逻辑，服务**不会**在部署完成后自动后台启动，你需要手动运行 `DHS`。
+- 如果你是普通用户且安装时未能创建快捷软链接，请运行安装目录下的 `./dhs_runner.sh`。
+
 ## 📚 相关链接
 
 - [DanHengServer](https://github.com/GamblerIX/DanHengServer) - 服务端

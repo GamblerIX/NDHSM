@@ -646,32 +646,91 @@ configure_server() {
         log_warning "jq 未安装，跳过配置修改 (使用默认值)"
     fi
     
-    # 重新启动服务
-    log_info "重新启动服务..."
-    local server_exe
-    cd "$INSTALL_DIR"
-    if [ -f "DanhengServer" ]; then
-        server_exe="./DanhengServer"
-    elif [ -f "GameServer" ]; then
-        server_exe="./GameServer"
     else
-        log_error "未找到服务端可执行文件"
-        exit 1
+        log_warning "jq 未安装，跳过配置修改 (使用默认值)"
     fi
     
-    chmod +x "$server_exe"
+    log_success "配置已完成"
+}
+
+# ============================================
+# 步骤 8: 创建快捷指令
+# ============================================
+
+create_shortcut() {
+    log_step 8 "创建快捷指令 DHS..."
     
-    nohup "$server_exe" > "$INSTALL_DIR/server.log" 2>&1 &
-    local server_pid=$!
-    sleep 3
-    
-    if kill -0 "$server_pid" 2>/dev/null; then
-        log_success "服务已重新启动 (PID: $server_pid)"
-        rm -f "$INSTALL_DIR"/*.zip "$INSTALL_DIR"/*.tar.gz 2>/dev/null || true
-    else
-        log_error "服务重启失败，请检查日志: $INSTALL_DIR/server.log"
-        exit 1
+    local shortcut_path="/usr/local/bin/DHS"
+    local script_content="#!/bin/bash
+set -e
+
+# 配置
+INSTALL_DIR=\"$INSTALL_DIR\"
+GC_LIMIT=\"$GC_LIMIT\"
+
+# 检测架构并设置 GC
+detect_arch() {
+    local arch=\$(uname -m)
+    case \$arch in
+        x86_64) echo \"linux-x64\" ;;
+        aarch64|arm64) echo \"linux-arm64\" ;;
+        *) echo \"unknown\" ;;
+    esac
+}
+
+# 自动计算 GC (如果未指定)
+if [ -z \"\$GC_LIMIT\" ]; then
+    available_mem_kb=\$(grep MemAvailable /proc/meminfo 2>/dev/null | awk '{print \$2}')
+    if [ -z \"\$available_mem_kb\" ]; then
+        available_mem_kb=\$(free | awk '/^Mem:/{print \$7}')
     fi
+    # 50% 内存
+    calc_limit=\$((available_mem_kb * 1024 / 2))
+    # 限制范围 [128MB, 4GB]
+    [ \"\$calc_limit\" -lt 134217728 ] && calc_limit=134217728
+    [ \"\$calc_limit\" -gt 4294967296 ] && calc_limit=4294967296
+    
+    export DOTNET_GCHeapHardLimit=\$calc_limit
+    export DOTNET_GC_HEAP_LIMIT=\$calc_limit
+else
+    # 手动指定 (MB)
+    limit_bytes=\$((GC_LIMIT * 1048576))
+    export DOTNET_GCHeapHardLimit=\$limit_bytes
+    export DOTNET_GC_HEAP_LIMIT=\$limit_bytes
+fi
+
+export DOTNET_EnableDiagnostics=0
+export DOTNET_gcServer=0
+export DOTNET_TieredCompilation=0
+export DOTNET_GCConcurrent=1
+
+cd \"\$INSTALL_DIR\"
+
+echo \"正在启动 DanHengServer...\"
+if [ -f \"DanhengServer\" ]; then
+    ./DanhengServer
+elif [ -f \"GameServer\" ]; then
+    ./GameServer
+else
+    echo \"错误: 未找到可执行文件\"
+    exit 1
+fi
+"
+
+    # 写入文件
+    echo "$script_content" > "$INSTALL_DIR/dhs_runner.sh"
+    chmod +x "$INSTALL_DIR/dhs_runner.sh"
+    
+    # 创建软链接
+    if [ "$IS_ROOT" = true ]; then
+        rm -f "$shortcut_path"
+        ln -s "$INSTALL_DIR/dhs_runner.sh" "$shortcut_path"
+        log_success "快捷指令已创建: DHS (输入 'DHS' 即可启动服务)"
+    else
+        log_warning "非 root 用户无法创建 /usr/local/bin/DHS，请手动运行: $INSTALL_DIR/dhs_runner.sh"
+        log_info "或者设置别名: alias DHS='$INSTALL_DIR/dhs_runner.sh'"
+    fi
+}
 }
 
 # ============================================
@@ -790,7 +849,7 @@ start_server() {
 # 主流程
 # ============================================
 
-TOTAL_STEPS=7
+TOTAL_STEPS=8
 
 main() {
     echo ""
@@ -798,6 +857,11 @@ main() {
     echo -e "${CYAN}  NDHSM Linux DeployOnDebian13 自动部署脚本${NC}"
     echo -e "${CYAN}============================================${NC}"
     echo ""
+    
+    # 修复管道执行时的交互问题
+    if [ ! -t 0 ] && [ -e /dev/tty ]; then
+        exec < /dev/tty
+    fi
     
     # 解析参数
     parse_args "$@"
@@ -817,6 +881,10 @@ main() {
     configure_firewall
     start_server
     configure_server
+    create_shortcut
+    
+    # 清理临时文件
+    rm -f "$INSTALL_DIR"/*.zip "$INSTALL_DIR"/*.tar.gz 2>/dev/null || true
     
     echo ""
     echo -e "${GREEN}============================================${NC}"
@@ -827,9 +895,8 @@ main() {
     echo -e "HTTP 端口: ${CYAN}$HTTP_PORT${NC}"
     echo -e "运行用户: ${CYAN}$(whoami)${NC}"
     echo ""
-    echo -e "管理命令:"
-    echo -e "  查看日志:   ${YELLOW}tail -f $INSTALL_DIR/server.log${NC}"
-    echo -e "  停止服务:   ${YELLOW}pkill -f $INSTALL_DIR/DanhengServer${NC}"
+    echo -e "启动方式:"
+    echo -e "  直接运行:   ${YELLOW}DHS${NC}"
     echo ""
 }
 
