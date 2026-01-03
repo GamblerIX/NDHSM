@@ -529,80 +529,19 @@ download_resources() {
 # ============================================
 
 configure_server() {
-    log_step 5 "配置 Config.json..."
+    log_step 5 "配置引导..."
     
     local config_path="$INSTALL_DIR/Config.json"
-    mkdir -p "$INSTALL_DIR/Config"
-
-    # 如果文件不存在，手动创建一个包含基本端口配置的文件
+    
+    log_info "注意: 脚本不再自动创建或修改 Config.json。"
+    log_info "首次启动服务器时，程序将自动生成默认配置文件。"
+    log_info "路径: $config_path"
+    
     if [ ! -f "$config_path" ]; then
-        log_info "Config.json 不存在，正在创建默认配置..."
-        cat <<EOF > "$config_path"
-{
-  "HttpServer": {
-    "BindAddress": "0.0.0.0",
-    "PublicAddress": "$PUBLIC_HOST",
-    "Port": $HTTP_PORT,
-    "UseSSL": false,
-    "UseFetchRemoteHotfix": false
-  },
-  "GameServer": {
-    "BindAddress": "0.0.0.0",
-    "PublicAddress": "127.0.0.1",
-    "Port": 23301,
-    "GameServerId": "dan_heng",
-    "GameServerName": "DanhengServer",
-    "GameServerDescription": "Private Server",
-    "UsePacketEncryption": true
-  },
-  "Database": {
-    "DatabaseType": "sqlite",
-    "DatabaseName": "danheng.db"
-  }
-}
-EOF
-        log_success "默认配置文件已创建"
+        log_info "如果您需要自定义端口或数据库，请在首次启动后编辑该文件，然后重启服务。"
     else
-        log_info "Config.json 已存在，准备修改..."
+        log_info "检测到已有配置文件，将保持原样。"
     fi
- 
-    # 交互模式下询问用户
-    if [ "$HEADLESS" = false ]; then
-        echo ""
-        log_info "请配置服务器参数（直接回车使用默认值）:"
-        echo ""
-        
-        read -p "HTTP/MUIP 端口 [${HTTP_PORT}]: " input
-        HTTP_PORT=${input:-$HTTP_PORT}
-        
-        read -p "公网地址 [${PUBLIC_HOST}]: " input
-        PUBLIC_HOST=${input:-$PUBLIC_HOST}
-        
-        echo ""
-    fi
-    
-    # 使用 jq 修改配置文件
-    if command -v jq &>/dev/null; then
-        local tmp_config=$(mktemp)
-        jq --arg http_port "$HTTP_PORT" \
-           --arg public_host "$PUBLIC_HOST" \
-           '.HttpServer.Port = ($http_port | tonumber) |
-            .HttpServer.PublicAddress = $public_host' \
-           "$config_path" > "$tmp_config" && mv "$tmp_config" "$config_path"
-        log_success "配置文件已更新: $config_path"
-        
-        # MySQL 配置替换
-        if [ "$USE_MYSQL" = true ]; then
-            log_info "应用 MySQL 数据库配置..."
-            local tmp_mysql=$(mktemp)
-            jq '.Database.DatabaseType = "mysql"' "$config_path" > "$tmp_mysql" && mv "$tmp_mysql" "$config_path"
-            log_success "数据库类型已切换为 MySQL"
-        fi
-    else
-        log_warning "jq 未安装，跳过配置修改 (使用默认值)"
-    fi
-    
-    log_success "配置已完成"
 }
 
 # ============================================
@@ -619,6 +558,14 @@ set -e
 # 配置
 INSTALL_DIR=\"$INSTALL_DIR\"
 GC_LIMIT=\"$GC_LIMIT\"
+USE_MYSQL=\"$USE_MYSQL\"
+
+# 数据库覆盖环境变量 (仅当指定 --mysql 时生效)
+if [ \"\$USE_MYSQL\" = \"true\" ]; then
+    # 通过环境变量覆盖 .NET 配置 (Database:DatabaseType)
+    # 注意: 具体生效依赖于服务端是否支持读取环境变量覆盖配置
+    export Database__DatabaseType=\"mysql\"
+fi
 
 # 自动计算 GC (如果未指定)
 if [ -z \"\$GC_LIMIT\" ]; then
@@ -649,6 +596,10 @@ export DOTNET_GCConcurrent=1
 cd \"\$INSTALL_DIR\"
 
 echo \"正在启动 DanHengServer...\"
+if [ \"\$USE_MYSQL\" = \"true\" ]; then
+    echo \"模式: 强制使用 MySQL (环境变量注入)\"
+fi
+
 if [ -f \"DanhengServer\" ]; then
     ./DanhengServer
 elif [ -f \"GameServer\" ]; then

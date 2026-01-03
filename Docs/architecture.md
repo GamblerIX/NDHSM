@@ -19,25 +19,26 @@ NDHSM/
 
 ### deploy.sh 部署流程
 
-1. **依赖检测与安装** - 使用 `dpkg-query` 精准检测（curl, wget, git, unzip, jq, libicu-dev 等）。
-2. **选择并检测代理** - (可选) `--gh-proxy` 自动测速并选择可用的 GitHub 加速代理。
-3. **下载服务器** - 从 GitHub Releases 获取 self-contained 版本。
-4. **下载资源文件** - 从 GitHub Releases 下载 DanHengServerResources ZIP 包。
-5. **配置防火墙** - 支持 `ufw`, `firewalld` 和 `iptables`。
-6. **启动服务** - 使用 `nohup` 后台运行，日志重定向至 `server.log`。
-7. **配置 Config.json** - 服务启动后自动生成并使用 `jq` 修改。
+1. **换源** - (可选) 支持切换阿里云/官方源，解决依赖安装问题。
+2. **依赖检测与安装** - 使用 `dpkg-query` 精准检测（curl, wget, git, unzip, jq, libicu-dev 等）。
+3. **下载服务器** - 从 GitHub Releases 获取 self-contained 版本 (直连)。
+4. **下载资源文件** - 从 GitHub Releases 下载 DanHengServerResources ZIP 包 (直连)。
+5. **创建启动脚本** - 生成 `DHS` 快捷指令和 `dhs_runner.sh`，封装 GC 优化和配置环境变量。
+6. **配置引导** - 提示用户手动修改 `Config.json`（不再自动生成）。
 
 ### 命令行参数
 
 | 参数 | 说明 |
 |------|------|
 | `--headless`, `-H` | 无头模式，跳过所有交互式问题 |
-| `--http-port PORT` | HTTP/MUIP 端口（默认 23300） |
-| `--host HOST` | 设置服务器的公网地址 |
-| `--open-firewall` | 显式触发防火墙端口开放逻辑（需 root） |
-| `--termux` | **Termux 专属优化**：隐含无头模式，强制安装 libicu，预设 128MB 堆限制 |
-| `--gh-proxy` | 开启 GitHub 加速下载（自动测速选择最佳代理） |
+| `--http-port PORT` | 提示用户配置 HTTP/MUIP 端口（仅提示，不修改文件） |
+| `--host HOST` | 提示用户配置公网地址（仅提示，不修改文件） |
+| `--termux` | **Termux 专属优化**：隐含无头模式，强制无头，预设 128MB 堆限制 |
 | `--gc-limit MB` | 手动设置 .NET GC 堆内存上限（单位 MB） |
+| `--mirror1` | 切换 APT 源为阿里云镜像（国内推荐） |
+| `--mirror2` | 切换 APT 源为官方源 |
+| `--mysql` | 启用 MySQL 模式（在 `DHS` 启动指令中注入环境变量覆盖配置） |
+
 
 ## 📱 Termux 环境
 
