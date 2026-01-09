@@ -396,8 +396,8 @@ download_and_extract() {
 download_resources() {
     log_step 4 "下载资源文件 (Resources & Config)..."
     
-    local resources_dir="$INSTALL_DIR/resources"
-    local config_dir="$INSTALL_DIR/config"
+    local resources_dir="$INSTALL_DIR/Resources"
+    local config_dir="$INSTALL_DIR/Config"
     
     # 下载 Resources (检测 ExcelOutput 目录)
     if [ -d "$resources_dir/ExcelOutput" ]; then
