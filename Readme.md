@@ -37,32 +37,36 @@ curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/D
 DHS
 ```
 
-该命令会：
-1. 自动计算并配置 .NET GC 限制（针对低内存环境优化）
-2. 在前台启动 DanHengServer（方便查看实时日志）
+> 该命令会在后台启动 DanHengServer 
+> 服务不会在部署完成后自动启动，需手动运行 `DHS`。
 
-> **注意**: 
-> 1. 服务不会在部署完成后自动启动，需手动运行 `DHS`。
-> 2. 部署脚本不再自动修改 `Config.json`。如需修改端口或数据库配置，请在首次启动后编辑生成的配置文件，然后重启服务。
 
 ## 📋 命令参数
 
+### deploy.sh 部署脚本
+
 | 参数 | 说明 |
 |------|------|
-| `--headless`, `-H` | 无头模式，跳过交互（默认使用阿里云源） |
+| `--headless`, `-H` | 无头模式，跳过交互（跳过换源） |
 | `--termux` | Termux 优化模式（无头 + GC 限制 128MB） |
-| `--no-mirror` | 无头模式下跳过换源 |
-| `--http-port PORT` | 提示用户配置端口（仅提示，不再自动修改文件） |
-| `--mysql` | 启用 MySQL 模式（在启动指令中修改 Config.json） |
+
+### DHS.sh 服务管理
+
+| 参数 | 说明 |
+|------|------|
+| (无参数) | 启动服务 |
+| `--stop` | 停止服务 |
 | `--delete` | 彻底删除安装目录及全部数据 |
+| `--help` | 显示帮助信息 |
 
 ## 📚 相关链接
 
 - [DanHengServer](https://github.com/GamblerIX/DanHengServer) - 服务端
+- [DanHengServerConfig](https://github.com/GamblerIX/DanHengServerConfig) - 服务端配置文件
 - [DanHengProxy](https://github.com/GamblerIX/DanHengProxy) - 代理工具
 - [DanHengServerResources](https://github.com/GamblerIX/DanHengServerResources) - 资源文件
 - [NDHSM](https://github.com/GamblerIX/NDHSM) - 自动化工具
-- [DanHeng](https://github.com/GamblerIX/DanHeng) - 链接上述所有仓库
+- [DanHeng](https://github.com/GamblerIX/DanHeng) - 链接上述所有仓库及官方源仓库的复刻
 
 ## 📄 许可证
 

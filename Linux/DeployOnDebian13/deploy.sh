@@ -1,21 +1,22 @@
 # ============================================
 # NDHSM Linux DeployOnDebian13 全自动部署脚本
 # 相关文件:
+#   - ./ChangeSource.sh (独立换源脚本)
+#   - ./DHS.sh (启动脚本模板)
 #   - ../TermuxToDebian13/setup_debian.sh (Termux 环境初始化)
 #   - ../../Readme.md (项目主说明文档)
 # ============================================
 #
 # 功能说明:
-# 1. 一键换源 (阿里云/官方)
+# 1. 一键换源 (交互式选择或无头模式跳过)
 # 2. 自动安装系统依赖
 # 3. 从 GitHub 下载自包含版本服务器
 # 4. 下载资源文件
-# 5. 自动生成/配置 Config.json
-# 6. 创建 DHS 快捷启动指令
+# 5. 创建 DHS 快捷启动指令 (基于 screen 管理)
 #
 # 使用方法:
 #   交互模式: bash deploy.sh
-#   无头模式: bash deploy.sh --headless --mirror1 --http-port 23300
+#   无头模式: bash deploy.sh --headless
 #
 # ============================================
 
@@ -33,6 +34,7 @@ INSTALL_DIR="/opt/danheng"
 # 仓库地址
 GITHUB_SERVER_RELEASES="https://api.github.com/repos/GamblerIX/DanHengServer/releases/latest"
 GITHUB_RESOURCES_RELEASES="https://api.github.com/repos/GamblerIX/DanHengServerResources/releases/latest"
+GITHUB_CONFIG_RELEASES="https://api.github.com/repos/GamblerIX/DanHengServerConfig/releases/latest"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -68,12 +70,12 @@ log_step() {
 
 check_root() {
     if [ "$EUID" -ne 0 ]; then
-        IS_ROOT=false
-        log_info "当前以普通用户身份运行"
-    else
-        IS_ROOT=true
-        log_info "当前以 root 身份运行"
+        log_error "此脚本需要 root 权限运行"
+        log_info "请使用: sudo bash deploy.sh [选项]"
+        exit 1
     fi
+    IS_ROOT=true
+    log_info "当前以 root 身份运行"
 }
 
 # 获取架构
@@ -87,7 +89,7 @@ detect_arch() {
             echo "linux-arm64"
             ;;
         *)
-            log_error "不支持的架构: $arch (目前仅支持 x64 和 arm64)"
+            log_error "不支持的架构: $arch "
             exit 1
             ;;
     esac
@@ -101,9 +103,6 @@ HEADLESS=false
 HTTP_PORT=$DEFAULT_HTTP_PORT
 PUBLIC_HOST=$DEFAULT_HOST
 TERMUX_MODE=false
-DELETE_MODE=false  # 彻底删除模式
-USE_MYSQL=false    # 使用 MySQL 数据库
-NO_MIRROR=false    # 无头模式下跳过换源
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -125,21 +124,9 @@ parse_args() {
                 HEADLESS=true  # Termux 模式强制无头
                 shift
                 ;;
-            --no-mirror)
-                NO_MIRROR=true
-                shift
-                ;;
             --help|-h)
                 show_help
                 exit 0
-                ;;
-            --delete)
-                DELETE_MODE=true
-                shift
-                ;;
-            --mysql)
-                USE_MYSQL=true
-                shift
                 ;;
             *)
                 log_error "未知参数: $1"
@@ -157,75 +144,24 @@ NDHSM Linux DeployOnDebian13 全自动部署脚本
 用法: bash deploy.sh [选项]
 
 选项:
-  --headless, -H      无头模式，跳过交互（默认使用阿里云源）
+  --headless, -H      无头模式，跳过交互（默认不换源）
   --http-port PORT    HTTP/MUIP 端口（默认: $DEFAULT_HTTP_PORT）
   --host HOST         公网地址（默认: $DEFAULT_HOST）
   --termux            Termux 优化（无头模式 + GC 限制 128MB）
-  --no-mirror         无头模式下跳过换源
-  --delete            彻底删除安装目录及全部数据
-  --mysql             将数据库类型替换为 MySQL
   --help, -h          显示帮助信息
 
 示例:
   # 交互模式（会询问是否换源）
   bash deploy.sh
 
-  # 无头模式（默认使用阿里云源）
+  # 无头模式（跳过换源）
   bash deploy.sh --headless
 
-  # Termux 无头模式（默认使用阿里云源）
+  # Termux 无头模式
   bash deploy.sh --termux
-
-  # 无头模式但跳过换源
-  bash deploy.sh --headless --no-mirror
 EOF
 }
 
-# ============================================
-# 删除安装功能
-# ============================================
-
-delete_installation() {
-    echo ""
-    echo -e "${RED}============================================${NC}"
-    echo -e "${RED}  彻底删除模式${NC}"
-    echo -e "${RED}============================================${NC}"
-    echo ""
-    
-    if [ ! -d "$INSTALL_DIR" ]; then
-        log_info "安装目录不存在: $INSTALL_DIR"
-        exit 0
-    fi
-    
-    # 非无头模式下请求确认
-    if [ "$HEADLESS" = false ]; then
-        echo -e "${YELLOW}警告: 此操作将删除以下内容:${NC}"
-        echo -e "  - 目录: $INSTALL_DIR"
-        echo -e "  - 所有配置文件、日志、数据库"
-        echo ""
-        read -p "确认删除？输入 'yes' 继续: " confirm
-        if [ "$confirm" != "yes" ]; then
-            log_info "操作已取消"
-            exit 0
-        fi
-    fi
-    
-    # 停止服务
-    log_info "正在停止服务..."
-    pkill -f "$INSTALL_DIR/DanhengServer" 2>/dev/null || true
-    pkill -f "$INSTALL_DIR/GameServer" 2>/dev/null || true
-    sleep 2
-    
-    # 删除目录
-    log_info "正在删除安装目录..."
-    rm -rf "$INSTALL_DIR"
-    
-    # 删除快捷指令
-    rm -f /usr/local/bin/DHS 2>/dev/null || true
-    
-    log_success "已彻底删除 $INSTALL_DIR"
-    exit 0
-}
 
 # ============================================
 # 步骤 1: 换源
@@ -234,105 +170,39 @@ delete_installation() {
 change_apt_source() {
     log_step 1 "配置 APT 源..."
     
-    local sources_file="/etc/apt/sources.list"
-    local sources_dir="/etc/apt/sources.list.d"
-    local backup_file="/etc/apt/sources.list.bak"
-    local mirror_choice=""
-    
-    # 决定换源选项
-    if [ "$NO_MIRROR" = true ]; then
-        log_info "跳过换源（--no-mirror）"
+    if [ "$HEADLESS" = true ]; then
+        log_info "无头模式，跳过换源"
         return 0
-    elif [ "$HEADLESS" = true ]; then
-        # 无头模式默认使用阿里云源
-        mirror_choice="1"
-        log_info "无头模式，默认使用阿里云源"
-    else
-        # 交互模式，询问用户
-        echo ""
-        echo -e "${CYAN}请选择 APT 软件源:${NC}"
-        echo "  1) 阿里云镜像（国内推荐）"
-        echo "  2) Debian 官方源"
-        echo "  3) 跳过，保持当前配置"
-        echo ""
-        read -p "请输入选项 [1/2/3] (默认: 1): " mirror_choice
-        mirror_choice=${mirror_choice:-1}
     fi
+
+    # 询问是否换源
+    echo ""
+    echo -e "${CYAN}是否运行换源脚本？${NC}"
+    echo "  1) 是 (运行 ChangeSource.sh)"
+    echo "  2) 否 (跳过)"
+    echo ""
+    read -p "请输入选项 [1/2] (默认: 1): " choice
+    choice=${choice:-1}
     
-    # 跳过换源
-    if [ "$mirror_choice" = "3" ]; then
-        log_info "跳过换源，保持当前配置"
+    if [ "$choice" != "1" ]; then
+        log_info "已跳过换源"
         return 0
     fi
     
-    # 自动检测 Debian 版本代号
-    local codename
-    if [ -f /etc/os-release ]; then
-        codename=$(grep "^VERSION_CODENAME=" /etc/os-release | cut -d= -f2)
-    fi
-    
-    # 如果无法检测，默认使用 trixie (Debian 13)
-    if [ -z "$codename" ]; then
-        codename="trixie"
-        log_warning "无法检测 Debian 版本，默认使用 $codename"
-    else
-        log_info "检测到 Debian 版本: $codename"
-    fi
-    
-    # 备份原文件
-    [ ! -f "$backup_file" ] && cp "$sources_file" "$backup_file"
-    
-    # 清理可能冲突的源文件
-    rm -f "$sources_dir"/*.sources 2>/dev/null || true
-    rm -f "$sources_dir"/*.list 2>/dev/null || true
-    
-    if [ "$mirror_choice" = "1" ]; then
-        log_info "切换到阿里云镜像源（使用 HTTP 以兼容无证书环境）..."
-        if [ "$codename" = "trixie" ] || [ "$codename" = "sid" ]; then
-            # Debian 13 (Trixie) / Sid - 无 security 仓库分离
-            cat > "$sources_file" << EOF
-deb http://mirrors.aliyun.com/debian/ $codename main contrib non-free non-free-firmware
-deb http://mirrors.aliyun.com/debian/ $codename-updates main contrib non-free non-free-firmware
-EOF
-        else
-            # Debian 12 (Bookworm) 及更早版本
-            cat > "$sources_file" << EOF
-deb http://mirrors.aliyun.com/debian/ $codename main contrib non-free non-free-firmware
-deb http://mirrors.aliyun.com/debian/ $codename-updates main contrib non-free non-free-firmware
-deb http://mirrors.aliyun.com/debian-security $codename-security main contrib non-free non-free-firmware
-EOF
-        fi
-        log_success "已切换到阿里云镜像源"
-    elif [ "$mirror_choice" = "2" ]; then
-        log_info "切换到官方源..."
-        if [ "$codename" = "trixie" ] || [ "$codename" = "sid" ]; then
-            cat > "$sources_file" << EOF
-deb http://deb.debian.org/debian $codename main contrib non-free non-free-firmware
-deb http://deb.debian.org/debian $codename-updates main contrib non-free non-free-firmware
-EOF
-        else
-            cat > "$sources_file" << EOF
-deb http://deb.debian.org/debian $codename main contrib non-free non-free-firmware
-deb http://deb.debian.org/debian $codename-updates main contrib non-free non-free-firmware
-deb http://security.debian.org/debian-security $codename-security main contrib non-free non-free-firmware
-EOF
-        fi
-        log_success "已切换到官方源"
-    else
-        log_warning "无效选项，跳过换源"
-        return 0
-    fi
-    
-    # 立即更新源索引
-    log_info "正在更新软件包索引..."
-    if ! apt-get update -qq 2>/dev/null; then
-        log_warning "apt-get update 遇到警告，将继续尝试..."
-        apt-get update 2>&1 | grep -i "^E:" && {
-            log_error "更新软件包索引失败，请检查网络连接"
-            exit 1
+    local remote_script_url="https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/ChangeSource.sh"
+    local tmp_script="/tmp/ChangeSource.sh"
+
+    log_info "正在下载换源脚本..."
+    if curl -sSL -o "$tmp_script" "$remote_script_url"; then
+        chmod +x "$tmp_script"
+        log_info "运行下载的 ChangeSource.sh..."
+        bash "$tmp_script" || {
+             log_warning "换源脚本运行异常"
         }
+        rm -f "$tmp_script"
+    else
+        log_warning "下载换源脚本失败，跳过换源步骤。"
     fi
-    log_success "软件包索引已更新"
 }
 
 # ============================================
@@ -359,9 +229,9 @@ install_dependencies() {
         return 0
     fi
 
-    # 如果未换源，先更新索引
-    if [ -z "$MIRROR_OPTION" ]; then
-        log_info "正在更新软件包索引..."
+    # 如果跳过换源，先更新索引
+    if [ "$NO_MIRROR" = true ]; then
+        log_info "正在更新软件包索引...（）"
         apt-get update -qq || log_warning "apt-get update 遇到警告"
     fi
 
@@ -369,7 +239,6 @@ install_dependencies() {
     log_info "待安装依赖: ${missing[*]}"
     if ! apt-get install -y "${missing[@]}"; then
         log_error "依赖安装失败，请检查网络连接或软件源配置"
-        log_info "提示: 可尝试使用 --mirror1 或 --mirror2 参数切换软件源"
         exit 1
     fi
     
@@ -474,204 +343,157 @@ download_server() {
 # ============================================
 
 download_resources() {
-    log_step 4 "下载资源文件..."
+    log_step 4 "下载资源文件 (Resources & Config)..."
     
-    local resources_dir="$INSTALL_DIR/Resources"
-    
-    if [ -d "$resources_dir" ]; then
-        log_info "Resources 目录已存在，跳过下载"
-        return 0
-    fi
-    
-    cd "$INSTALL_DIR"
-    
-    # 获取资源 ZIP 下载地址
-    log_info "正在获取资源文件下载地址..."
-    local release_info
-    if ! release_info=$(curl -sSL --connect-timeout 15 --retry 3 "$GITHUB_RESOURCES_RELEASES" 2>/dev/null); then
-        log_error "无法连接到 GitHub API"
+    # ================================
+    # 1. 下载 Resources
+    # ================================
+    log_info "正在获取 Resources 下载地址..."
+    local res_release_info
+    if ! res_release_info=$(curl -sSL --connect-timeout 5 --retry 3 "$GITHUB_RESOURCES_RELEASES" 2>/dev/null); then
+        log_error "无法连接到 GitHub API (Resources)"
         exit 1
     fi
     
-    local download_url
-    download_url=$(echo "$release_info" | jq -r '.zipball_url // .assets[0].browser_download_url' 2>/dev/null)
+    # 优先查找名为 resources*.zip 的 asset
+    local res_download_url
+    res_download_url=$(echo "$res_release_info" | grep "browser_download_url" | grep -E "resources.*\.zip" | head -n 1 | cut -d '"' -f 4)
     
-    if [ -z "$download_url" ] || [ "$download_url" = "null" ]; then
-        log_error "无法获取资源文件下载地址"
+    # 如果找不到资源的 asset，尝试 zipball (兼容旧模式)
+    if [ -z "$res_download_url" ]; then
+        log_warning "未找到 resources*.zip Asset，尝试使用源码 zipball..."
+        res_download_url=$(echo "$res_release_info" | jq -r '.zipball_url' 2>/dev/null)
+    fi
+
+    if [ -z "$res_download_url" ] || [ "$res_download_url" = "null" ]; then
+        log_error "无法获取 Resources 下载地址"
         exit 1
     fi
     
-    log_info "解析到资源下载地址: $download_url"
-    
-    # 下载 ZIP 文件
-    local filename="resources.zip"
-    log_info "正在下载资源文件..."
-    if ! wget --show-progress -O "$filename" "$download_url"; then
-        log_error "资源下载失败"
-        rm -f "$filename"
+    local res_filename="resources.zip"
+    log_info "正在下载 Resources... ($res_download_url)"
+    if ! wget --show-progress -O "$res_filename" "$res_download_url"; then
+        log_error "Resources 下载失败"
+        rm -f "$res_filename"
         exit 1
     fi
     
-    # 解压 ZIP 文件
-    log_info "正在解压资源文件..."
-    if ! unzip -o -q "$filename"; then
-        log_error "资源文件解压失败"
-        rm -f "$filename"
+    log_info "正在解压 Resources..."
+    if ! unzip -o -q "$res_filename" -d "$INSTALL_DIR"; then
+        log_error "Resources 解压失败"
+        rm -f "$res_filename"
         exit 1
     fi
-    
-    # 整理目录结构 (GitHub zipball 会创建带版本号的子目录)
+    rm -f "$res_filename"
+
+    # 处理 zipball 解压后的目录结构
     for subdir in "$INSTALL_DIR"/GamblerIX-DanHengServerResources-* "$INSTALL_DIR"/DanHengServerResources-*; do
         if [ -d "$subdir" ]; then
-            log_info "正在整理资源目录结构..."
-            mv "$subdir" "$resources_dir" 2>/dev/null || true
+            log_info "整理 Resources 目录结构..."
+            cp -r "$subdir"/* "$INSTALL_DIR/" 2>/dev/null || true
+            rm -rf "$subdir"
             break
         fi
     done
+
+    # ================================
+    # 2. 下载 Config
+    # ================================
+    log_info "正在获取 Config 下载地址..."
+    local conf_release_info
+    if ! conf_release_info=$(curl -sSL --connect-timeout 5 --retry 3 "$GITHUB_CONFIG_RELEASES" 2>/dev/null); then
+        log_error "无法连接到 GitHub API (Config)"
+        exit 1
+    fi
+
+    local conf_download_url
+    conf_download_url=$(echo "$conf_release_info" | grep "browser_download_url" | grep -E "config.*\.zip" | head -n 1 | cut -d '"' -f 4)
     
-    # 清理下载的 ZIP 文件
-    rm -f "$filename"
-    
-    if [ ! -d "$resources_dir" ]; then
-        log_error "资源目录未能正确创建"
+    if [ -z "$conf_download_url" ]; then
+         log_warning "未找到 config*.zip Asset，尝试使用源码 zipball..."
+         conf_download_url=$(echo "$conf_release_info" | jq -r '.zipball_url' 2>/dev/null)
+    fi
+
+    if [ -z "$conf_download_url" ] || [ "$conf_download_url" = "null" ]; then
+        log_error "无法获取 Config 下载地址"
         exit 1
     fi
     
-    log_success "资源文件下载完成"
-}
+    local conf_filename="config.zip"
+    local config_target_dir="$INSTALL_DIR/Config"
+    mkdir -p "$config_target_dir"
 
-# ============================================
-# 步骤 5: 配置 Config.json
-# ============================================
-
-configure_server() {
-    log_step 5 "配置引导..."
-    
-    local config_path="$INSTALL_DIR/Config.json"
-    
-    log_info "注意: 脚本不再自动创建或修改 Config.json。"
-    log_info "首次启动服务器时，程序将自动生成默认配置文件。"
-    log_info "路径: $config_path"
-    
-    if [ ! -f "$config_path" ]; then
-        log_info "如果您需要自定义端口或数据库，请在首次启动后编辑该文件，然后重启服务。"
-    else
-        log_info "检测到已有配置文件，将保持原样。"
+    log_info "正在下载 Config... ($conf_download_url)"
+    if ! wget --show-progress -O "$conf_filename" "$conf_download_url"; then
+        log_error "Config 下载失败"
+        rm -f "$conf_filename"
+        exit 1
     fi
+
+    log_info "正在解压 Config 到 $config_target_dir..."
+    
+    # 解压到临时目录以处理可能的子目录结构
+    local tmp_config_dir="/tmp/dh_config_tmp"
+    rm -rf "$tmp_config_dir"
+    mkdir -p "$tmp_config_dir"
+    
+    if ! unzip -o -q "$conf_filename" -d "$tmp_config_dir"; then
+        log_error "Config 解压失败"
+        rm -f "$conf_filename"
+        exit 1
+    fi
+    rm -f "$conf_filename"
+    
+    # 智能移动
+    if [ "$(ls -A "$tmp_config_dir" | wc -l)" -eq 1 ] && [ -d "$tmp_config_dir/$(ls -A "$tmp_config_dir")" ]; then
+        local unique_subdir="$tmp_config_dir/$(ls -A "$tmp_config_dir")"
+        cp -r "$unique_subdir"/* "$config_target_dir/"
+    else
+        cp -r "$tmp_config_dir"/* "$config_target_dir/"
+    fi
+    rm -rf "$tmp_config_dir"
+
+    log_success "资源文件 (Resources & Config) 下载并部署完成"
 }
 
+
 # ============================================
-# 步骤 6: 创建快捷指令
+# 步骤 5: 创建快捷指令
 # ============================================
 
 create_shortcut() {
-    log_step 6 "创建快捷指令 DHS..."
+    log_step 5 "创建快捷指令 DHS..."
     
     local shortcut_path="/usr/local/bin/DHS"
-    local script_content="#!/bin/bash
-set -e
-
-# 配置
-INSTALL_DIR=\"$INSTALL_DIR\"
-TERMUX_MODE=\"$TERMUX_MODE\"
-USE_MYSQL=\"$USE_MYSQL\"
-
-# MySQL 模式：直接修改 Config.json
-if [ \"\$USE_MYSQL\" = \"true\" ]; then
-    CONFIG_FILE=\"\$INSTALL_DIR/Config.json\"
-    if [ -f \"\$CONFIG_FILE\" ]; then
-        # 简单检查是否已经是 mysql 配置，避免重复修改
-        if ! grep -q '\"DatabaseType\": \"mysql\"' \"\$CONFIG_FILE\"; then
-            echo \"正在切换数据库配置为 MySQL...\"
-            if command -v jq &>/dev/null; then
-                 # 使用 jq 安全更新配置
-                 tmp_config=\$(mktemp)
-                 jq '.Database = {
-                    \"DatabaseType\": \"mysql\",
-                    \"DatabaseName\": \"danheng\",
-                    \"MySqlHost\": \"127.0.0.1\",
-                    \"MySqlPort\": 3306,
-                    \"MySqlUser\": \"root\",
-                    \"MySqlPassword\": \"123456\",
-                    \"MySqlDatabase\": \"danheng\"
-                 }' \"\$CONFIG_FILE\" > \"\$tmp_config\" && mv \"\$tmp_config\" \"\$CONFIG_FILE\"
-                 echo \"Config.json 已更新为 MySQL 模式\"
-                 echo \"请注意：请务必检查 Config.json 中的 MySQL 连接信息是否正确！\"
-            else
-                 # 简易 sed 替换 (如果 jq 不存在)
-                 sed -i 's/\"DatabaseType\": \"sqlite\"/\"DatabaseType\": \"mysql\"/' \"\$CONFIG_FILE\"
-                 echo \"警告: jq 未安装，仅简单修改了 DatabaseType，可能需要手动补充 MySqlHost 等字段！\"
-            fi
-        fi
-    fi
-fi
-
-
-# GC 限制计算
-if [ \"\$TERMUX_MODE\" = \"true\" ]; then
-    # Termux 模式：固定 128MB 堆限制
-    limit_bytes=\$((128 * 1048576))
-    export DOTNET_GCHeapHardLimit=\$limit_bytes
-    export DOTNET_GC_HEAP_LIMIT=\$limit_bytes
-    echo \"Termux 模式: GC 堆限制 128MB\"
-else
-    # 自动计算 GC（取 50% 可用内存，限制在 128MB-4GB）
-    available_mem_kb=\$(grep MemAvailable /proc/meminfo 2>/dev/null | awk '{print \$2}')
-    if [ -z \"\$available_mem_kb\" ]; then
-        available_mem_kb=\$(free | awk '/^Mem:/{print \$7}')
-    fi
-    # 50% 内存
-    calc_limit=\$((available_mem_kb * 1024 / 2))
-    # 限制范围 [128MB, 4GB]
-    [ \"\$calc_limit\" -lt 134217728 ] && calc_limit=134217728
-    [ \"\$calc_limit\" -gt 4294967296 ] && calc_limit=4294967296
+    local script_path="$INSTALL_DIR/dhs_runner.sh"
+    local remote_dhs_url="https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/DHS.sh"
     
-    export DOTNET_GCHeapHardLimit=\$calc_limit
-    export DOTNET_GC_HEAP_LIMIT=\$calc_limit
-fi
-
-export DOTNET_EnableDiagnostics=0
-export DOTNET_gcServer=0
-export DOTNET_TieredCompilation=0
-export DOTNET_GCConcurrent=1
-
-cd \"\$INSTALL_DIR\"
-
-echo \"正在启动 DanHengServer...\"
-if [ \"\$USE_MYSQL\" = \"true\" ]; then
-    echo \"模式: 强制使用 MySQL (环境变量注入)\"
-fi
-
-if [ -f \"DanhengServer\" ]; then
-    ./DanhengServer
-elif [ -f \"GameServer\" ]; then
-    ./GameServer
-else
-    echo \"错误: 未找到可执行文件\"
-    exit 1
-fi
-"
-
-    # 写入文件
-    echo "$script_content" > "$INSTALL_DIR/dhs_runner.sh"
-    chmod +x "$INSTALL_DIR/dhs_runner.sh"
+    log_info "正在下载 DHS.sh 启动脚本..."
+    if ! curl -sSL --connect-timeout 10 --retry 3 -o "$script_path" "$remote_dhs_url"; then
+        log_error "DHS.sh 下载失败"
+        exit 1
+    fi
+    
+    # 替换占位符
+    sed -i "s|__PROJECT_DIR__|$INSTALL_DIR|g" "$script_path"
+    sed -i "s|__TERMUX_MODE__|$TERMUX_MODE|g" "$script_path"
+    
+    chmod +x "$script_path"
     
     # 创建软链接
-    if [ "$IS_ROOT" = true ]; then
-        rm -f "$shortcut_path"
-        ln -s "$INSTALL_DIR/dhs_runner.sh" "$shortcut_path"
-        log_success "快捷指令已创建: DHS (输入 'DHS' 即可启动服务)"
-    else
-        log_warning "非 root 用户无法创建 /usr/local/bin/DHS，请手动运行: $INSTALL_DIR/dhs_runner.sh"
-        log_info "或者设置别名: alias DHS='$INSTALL_DIR/dhs_runner.sh'"
-    fi
+    rm -f "$shortcut_path"
+    ln -s "$script_path" "$shortcut_path"
+    log_success "快捷指令已创建: DHS"
+    log_info "启动服务: DHS"
+    log_info "停止服务: DHS --stop"
+    log_info "查看输出: screen -r DanHengServer"
 }
 
 # ============================================
 # 主流程
 # ============================================
 
-TOTAL_STEPS=6
+TOTAL_STEPS=5
 
 main() {
     echo ""
@@ -685,23 +507,17 @@ main() {
         exec < /dev/tty
     fi
     
-    # 解析参数
-    parse_args "$@"
-    
-    # 删除模式检测
-    if [ "$DELETE_MODE" = true ]; then
-        delete_installation
-    fi
-    
     # 检查 root 权限
     check_root
+    
+    # 解析参数
+    parse_args "$@"
     
     # 执行部署步骤
     change_apt_source
     install_dependencies
     download_server
     download_resources
-    configure_server
     create_shortcut
     
     # 清理临时文件
