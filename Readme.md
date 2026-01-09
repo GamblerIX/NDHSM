@@ -6,14 +6,14 @@
 
 ### Linux Debian 13
 
-**标准部署（推荐使用阿里云源加速）：**
+**标准部署（交互模式，可选择软件源）：**
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --mirror1
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash
 ```
 
-**使用官方源部署：**
+**无头模式部署（默认使用阿里云源）：**
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --mirror2
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --headless
 ```
 
 ### Termux 一键部署
@@ -26,7 +26,7 @@ debian
 
 #### 第二步（Termux 专用部署）
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux --mirror1
+curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux
 ```
 
 ## 🎮 启动与管理
@@ -49,12 +49,10 @@ DHS
 
 | 参数 | 说明 |
 |------|------|
-| `--headless`, `-H` | 无头模式，跳过交互 |
-| `--mirror1` | 切换 APT 源为阿里云镜像（国内推荐） |
-| `--mirror2` | 切换 APT 源为官方源 |
-| `--termux` | Termux 优化模式 |
+| `--headless`, `-H` | 无头模式，跳过交互（默认使用阿里云源） |
+| `--termux` | Termux 优化模式（无头 + GC 限制 128MB） |
+| `--no-mirror` | 无头模式下跳过换源 |
 | `--http-port PORT` | 提示用户配置端口（仅提示，不再自动修改文件） |
-| `--gc-limit MB` | 手动设置 GC 内存限制 |
 | `--mysql` | 启用 MySQL 模式（在启动指令中修改 Config.json） |
 | `--delete` | 彻底删除安装目录及全部数据 |
 

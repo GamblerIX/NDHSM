@@ -101,10 +101,9 @@ HEADLESS=false
 HTTP_PORT=$DEFAULT_HTTP_PORT
 PUBLIC_HOST=$DEFAULT_HOST
 TERMUX_MODE=false
-GC_LIMIT=""  # 空表示自动检测
 DELETE_MODE=false  # 彻底删除模式
 USE_MYSQL=false    # 使用 MySQL 数据库
-MIRROR_OPTION=""   # 换源选项: 1=阿里云, 2=官方
+NO_MIRROR=false    # 无头模式下跳过换源
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -124,20 +123,10 @@ parse_args() {
             --termux)
                 TERMUX_MODE=true
                 HEADLESS=true  # Termux 模式强制无头
-                # Termux 模式下，如果不指定 GC 限制，则默认为 128
-                [ -z "$GC_LIMIT" ] && GC_LIMIT=128
                 shift
                 ;;
-            --gc-limit)
-                GC_LIMIT="$2"
-                shift 2
-                ;;
-            --mirror1)
-                MIRROR_OPTION="1"
-                shift
-                ;;
-            --mirror2)
-                MIRROR_OPTION="2"
+            --no-mirror)
+                NO_MIRROR=true
                 shift
                 ;;
             --help|-h)
@@ -168,26 +157,27 @@ NDHSM Linux DeployOnDebian13 全自动部署脚本
 用法: bash deploy.sh [选项]
 
 选项:
-  --headless, -H      无头模式，跳过交互
+  --headless, -H      无头模式，跳过交互（默认使用阿里云源）
   --http-port PORT    HTTP/MUIP 端口（默认: $DEFAULT_HTTP_PORT）
   --host HOST         公网地址（默认: $DEFAULT_HOST）
   --termux            Termux 优化（无头模式 + GC 限制 128MB）
-  --gc-limit MB       手动设置 GC 内存限制 (单位 MB，默认自动检测)
-  --mirror1           切换 APT 源为阿里云镜像（国内推荐）
-  --mirror2           切换 APT 源为官方源
+  --no-mirror         无头模式下跳过换源
   --delete            彻底删除安装目录及全部数据
   --mysql             将数据库类型替换为 MySQL
   --help, -h          显示帮助信息
 
 示例:
-  # 交互模式
+  # 交互模式（会询问是否换源）
   bash deploy.sh
 
-  # 无头模式 + 阿里云源
-  bash deploy.sh --headless --mirror1
+  # 无头模式（默认使用阿里云源）
+  bash deploy.sh --headless
 
-  # Termux 无头模式
-  bash deploy.sh --termux --mirror1
+  # Termux 无头模式（默认使用阿里云源）
+  bash deploy.sh --termux
+
+  # 无头模式但跳过换源
+  bash deploy.sh --headless --no-mirror
 EOF
 }
 
@@ -242,15 +232,38 @@ delete_installation() {
 # ============================================
 
 change_apt_source() {
-    if [ -z "$MIRROR_OPTION" ]; then
-        return 0
-    fi
-    
     log_step 1 "配置 APT 源..."
     
     local sources_file="/etc/apt/sources.list"
     local sources_dir="/etc/apt/sources.list.d"
     local backup_file="/etc/apt/sources.list.bak"
+    local mirror_choice=""
+    
+    # 决定换源选项
+    if [ "$NO_MIRROR" = true ]; then
+        log_info "跳过换源（--no-mirror）"
+        return 0
+    elif [ "$HEADLESS" = true ]; then
+        # 无头模式默认使用阿里云源
+        mirror_choice="1"
+        log_info "无头模式，默认使用阿里云源"
+    else
+        # 交互模式，询问用户
+        echo ""
+        echo -e "${CYAN}请选择 APT 软件源:${NC}"
+        echo "  1) 阿里云镜像（国内推荐）"
+        echo "  2) Debian 官方源"
+        echo "  3) 跳过，保持当前配置"
+        echo ""
+        read -p "请输入选项 [1/2/3] (默认: 1): " mirror_choice
+        mirror_choice=${mirror_choice:-1}
+    fi
+    
+    # 跳过换源
+    if [ "$mirror_choice" = "3" ]; then
+        log_info "跳过换源，保持当前配置"
+        return 0
+    fi
     
     # 自动检测 Debian 版本代号
     local codename
@@ -273,7 +286,7 @@ change_apt_source() {
     rm -f "$sources_dir"/*.sources 2>/dev/null || true
     rm -f "$sources_dir"/*.list 2>/dev/null || true
     
-    if [ "$MIRROR_OPTION" = "1" ]; then
+    if [ "$mirror_choice" = "1" ]; then
         log_info "切换到阿里云镜像源（使用 HTTP 以兼容无证书环境）..."
         if [ "$codename" = "trixie" ] || [ "$codename" = "sid" ]; then
             # Debian 13 (Trixie) / Sid - 无 security 仓库分离
@@ -290,8 +303,8 @@ deb http://mirrors.aliyun.com/debian-security $codename-security main contrib no
 EOF
         fi
         log_success "已切换到阿里云镜像源"
-    elif [ "$MIRROR_OPTION" = "2" ]; then
-        log_info "恢复官方源..."
+    elif [ "$mirror_choice" = "2" ]; then
+        log_info "切换到官方源..."
         if [ "$codename" = "trixie" ] || [ "$codename" = "sid" ]; then
             cat > "$sources_file" << EOF
 deb http://deb.debian.org/debian $codename main contrib non-free non-free-firmware
@@ -304,7 +317,10 @@ deb http://deb.debian.org/debian $codename-updates main contrib non-free non-fre
 deb http://security.debian.org/debian-security $codename-security main contrib non-free non-free-firmware
 EOF
         fi
-        log_success "已恢复官方源"
+        log_success "已切换到官方源"
+    else
+        log_warning "无效选项，跳过换源"
+        return 0
     fi
     
     # 立即更新源索引
@@ -557,7 +573,7 @@ set -e
 
 # 配置
 INSTALL_DIR=\"$INSTALL_DIR\"
-GC_LIMIT=\"$GC_LIMIT\"
+TERMUX_MODE=\"$TERMUX_MODE\"
 USE_MYSQL=\"$USE_MYSQL\"
 
 # MySQL 模式：直接修改 Config.json
@@ -591,8 +607,15 @@ if [ \"\$USE_MYSQL\" = \"true\" ]; then
 fi
 
 
-# 自动计算 GC (如果未指定)
-if [ -z \"\$GC_LIMIT\" ]; then
+# GC 限制计算
+if [ \"\$TERMUX_MODE\" = \"true\" ]; then
+    # Termux 模式：固定 128MB 堆限制
+    limit_bytes=\$((128 * 1048576))
+    export DOTNET_GCHeapHardLimit=\$limit_bytes
+    export DOTNET_GC_HEAP_LIMIT=\$limit_bytes
+    echo \"Termux 模式: GC 堆限制 128MB\"
+else
+    # 自动计算 GC（取 50% 可用内存，限制在 128MB-4GB）
     available_mem_kb=\$(grep MemAvailable /proc/meminfo 2>/dev/null | awk '{print \$2}')
     if [ -z \"\$available_mem_kb\" ]; then
         available_mem_kb=\$(free | awk '/^Mem:/{print \$7}')
@@ -605,11 +628,6 @@ if [ -z \"\$GC_LIMIT\" ]; then
     
     export DOTNET_GCHeapHardLimit=\$calc_limit
     export DOTNET_GC_HEAP_LIMIT=\$calc_limit
-else
-    # 手动指定 (MB)
-    limit_bytes=\$((GC_LIMIT * 1048576))
-    export DOTNET_GCHeapHardLimit=\$limit_bytes
-    export DOTNET_GC_HEAP_LIMIT=\$limit_bytes
 fi
 
 export DOTNET_EnableDiagnostics=0
