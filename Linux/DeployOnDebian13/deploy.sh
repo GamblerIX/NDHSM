@@ -357,10 +357,10 @@ download_resources() {
     
     # 优先查找名为 resources*.zip 的 asset
     local res_download_url
-    res_download_url=$(echo "$res_release_info" | grep "browser_download_url" | grep -E "resources.*\.zip" | head -n 1 | cut -d '"' -f 4)
+    res_download_url=$(echo "$res_release_info" | jq -r '.assets[] | select(.name | test("resources.*\\.zip"; "i")) | .browser_download_url' 2>/dev/null | head -1)
     
     # 如果找不到资源的 asset，尝试 zipball (兼容旧模式)
-    if [ -z "$res_download_url" ]; then
+    if [ -z "$res_download_url" ] || [ "$res_download_url" = "null" ]; then
         log_warning "未找到 resources*.zip Asset，尝试使用源码 zipball..."
         res_download_url=$(echo "$res_release_info" | jq -r '.zipball_url' 2>/dev/null)
     fi
@@ -378,23 +378,47 @@ download_resources() {
         exit 1
     fi
     
+    # 解压到临时目录以处理复杂的目录结构
+    local tmp_res_dir="/tmp/dh_resources_tmp"
+    rm -rf "$tmp_res_dir"
+    mkdir -p "$tmp_res_dir"
+
     log_info "正在解压 Resources..."
-    if ! unzip -o -q "$res_filename" -d "$INSTALL_DIR"; then
+    if ! unzip -o -q "$res_filename" -d "$tmp_res_dir"; then
         log_error "Resources 解压失败"
         rm -f "$res_filename"
         exit 1
     fi
     rm -f "$res_filename"
 
-    # 处理 zipball 解压后的目录结构
-    for subdir in "$INSTALL_DIR"/GamblerIX-DanHengServerResources-* "$INSTALL_DIR"/DanHengServerResources-*; do
-        if [ -d "$subdir" ]; then
-            log_info "整理 Resources 目录结构..."
-            cp -r "$subdir"/* "$INSTALL_DIR/" 2>/dev/null || true
-            rm -rf "$subdir"
-            break
+    # 智能整理 Resources 目录结构
+    # 查找 ExcelOutput 所在的目录作为根
+    log_info "正在智能识别资源目录结构..."
+    local res_root_dir=""
+    
+    # 1. 直接在根目录
+    if [ -d "$tmp_res_dir/ExcelOutput" ]; then
+        res_root_dir="$tmp_res_dir"
+    else
+        # 2. 查找子目录中的 ExcelOutput
+        # 使用 find 查找深度为2的 ExcelOutput 目录
+        local found_excel=$(find "$tmp_res_dir" -mindepth 2 -maxdepth 2 -type d -name "ExcelOutput" | head -n 1)
+        if [ -n "$found_excel" ]; then
+            res_root_dir=$(dirname "$found_excel")
         fi
-    done
+    fi
+
+    if [ -n "$res_root_dir" ]; then
+        log_info "定位到资源根目录: $res_root_dir"
+        log_info "正在部署资源文件到 $INSTALL_DIR..."
+        cp -r "$res_root_dir"/* "$INSTALL_DIR/" 2>/dev/null || true
+    else
+        log_error "资源目录结构识别失败：未在解压结果中找到 ExcelOutput 目录"
+        rm -rf "$tmp_res_dir"
+        exit 1
+    fi
+
+    rm -rf "$tmp_res_dir"
 
     # ================================
     # 2. 下载 Config
@@ -407,9 +431,9 @@ download_resources() {
     fi
 
     local conf_download_url
-    conf_download_url=$(echo "$conf_release_info" | grep "browser_download_url" | grep -E "config.*\.zip" | head -n 1 | cut -d '"' -f 4)
+    conf_download_url=$(echo "$conf_release_info" | jq -r '.assets[] | select(.name | test("config.*\\.zip"; "i")) | .browser_download_url' 2>/dev/null | head -1)
     
-    if [ -z "$conf_download_url" ]; then
+    if [ -z "$conf_download_url" ] || [ "$conf_download_url" = "null" ]; then
          log_warning "未找到 config*.zip Asset，尝试使用源码 zipball..."
          conf_download_url=$(echo "$conf_release_info" | jq -r '.zipball_url' 2>/dev/null)
     fi
