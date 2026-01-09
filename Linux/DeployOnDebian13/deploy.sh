@@ -342,142 +342,78 @@ download_server() {
 # 步骤 4: 下载资源文件 (ZIP)
 # ============================================
 
+# 通用下载解压函数
+# 参数: $1=API地址 $2=资源名称 $3=目标目录 $4=检测标记(可选,用于智能定位)
+download_and_extract() {
+    local api_url="$1" name="$2" target_dir="$3" marker="$4"
+    local tmp_dir="/tmp/dh_${name}_tmp"
+    
+    # 获取下载地址
+    log_info "正在获取 $name 下载地址..."
+    local release_info download_url
+    release_info=$(curl -sSL --connect-timeout 5 --retry 3 "$api_url" 2>/dev/null) || {
+        log_error "无法连接到 GitHub API ($name)"; exit 1
+    }
+    
+    # 优先查找 asset，回退到 zipball
+    download_url=$(echo "$release_info" | jq -r ".assets[] | select(.name | test(\"${name}.*\\\\.zip\"; \"i\")) | .browser_download_url" 2>/dev/null | head -1)
+    [ -z "$download_url" ] || [ "$download_url" = "null" ] && {
+        log_warning "未找到 ${name}*.zip Asset，使用 zipball..."
+        download_url=$(echo "$release_info" | jq -r '.zipball_url' 2>/dev/null)
+    }
+    [ -z "$download_url" ] || [ "$download_url" = "null" ] && { log_error "无法获取 $name 下载地址"; exit 1; }
+    
+    # 下载并解压
+    local filename="${name}.zip"
+    log_info "正在下载 $name..."
+    wget -q --show-progress -O "$filename" "$download_url" || { log_error "$name 下载失败"; rm -f "$filename"; exit 1; }
+    
+    rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
+    log_info "正在解压 $name..."
+    unzip -o -q "$filename" -d "$tmp_dir" || { log_error "$name 解压失败"; rm -f "$filename"; exit 1; }
+    rm -f "$filename"
+    
+    # 智能定位根目录 (如果指定了标记目录)
+    local src_dir="$tmp_dir"
+    if [ -n "$marker" ]; then
+        if [ ! -d "$tmp_dir/$marker" ]; then
+            local found=$(find "$tmp_dir" -mindepth 2 -maxdepth 2 -type d -name "$marker" | head -1)
+            [ -n "$found" ] && src_dir=$(dirname "$found")
+        fi
+        [ ! -d "$src_dir/$marker" ] && { log_error "$name 目录结构识别失败"; rm -rf "$tmp_dir"; exit 1; }
+    else
+        # 无标记时：若只有一个子目录则进入
+        [ "$(ls -A "$tmp_dir" | wc -l)" -eq 1 ] && [ -d "$tmp_dir/$(ls -A "$tmp_dir")" ] && src_dir="$tmp_dir/$(ls -A "$tmp_dir")"
+    fi
+    
+    # 部署文件
+    mkdir -p "$target_dir"
+    log_info "正在部署 $name 到 $target_dir..."
+    cp -r "$src_dir"/* "$target_dir/"
+    rm -rf "$tmp_dir"
+}
+
 download_resources() {
     log_step 4 "下载资源文件 (Resources & Config)..."
     
-    # ================================
-    # 1. 下载 Resources
-    # ================================
-    log_info "正在获取 Resources 下载地址..."
-    local res_release_info
-    if ! res_release_info=$(curl -sSL --connect-timeout 5 --retry 3 "$GITHUB_RESOURCES_RELEASES" 2>/dev/null); then
-        log_error "无法连接到 GitHub API (Resources)"
-        exit 1
-    fi
+    local resources_dir="$INSTALL_DIR/resources"
+    local config_dir="$INSTALL_DIR/config"
     
-    # 优先查找名为 resources*.zip 的 asset
-    local res_download_url
-    res_download_url=$(echo "$res_release_info" | jq -r '.assets[] | select(.name | test("resources.*\\.zip"; "i")) | .browser_download_url' 2>/dev/null | head -1)
-    
-    # 如果找不到资源的 asset，尝试 zipball (兼容旧模式)
-    if [ -z "$res_download_url" ] || [ "$res_download_url" = "null" ]; then
-        log_warning "未找到 resources*.zip Asset，尝试使用源码 zipball..."
-        res_download_url=$(echo "$res_release_info" | jq -r '.zipball_url' 2>/dev/null)
-    fi
-
-    if [ -z "$res_download_url" ] || [ "$res_download_url" = "null" ]; then
-        log_error "无法获取 Resources 下载地址"
-        exit 1
-    fi
-    
-    local res_filename="resources.zip"
-    log_info "正在下载 Resources... ($res_download_url)"
-    if ! wget --show-progress -O "$res_filename" "$res_download_url"; then
-        log_error "Resources 下载失败"
-        rm -f "$res_filename"
-        exit 1
-    fi
-    
-    # 解压到临时目录以处理复杂的目录结构
-    local tmp_res_dir="/tmp/dh_resources_tmp"
-    rm -rf "$tmp_res_dir"
-    mkdir -p "$tmp_res_dir"
-
-    log_info "正在解压 Resources..."
-    if ! unzip -o -q "$res_filename" -d "$tmp_res_dir"; then
-        log_error "Resources 解压失败"
-        rm -f "$res_filename"
-        exit 1
-    fi
-    rm -f "$res_filename"
-
-    # 智能整理 Resources 目录结构
-    # 查找 ExcelOutput 所在的目录作为根
-    log_info "正在智能识别资源目录结构..."
-    local res_root_dir=""
-    
-    # 1. 直接在根目录
-    if [ -d "$tmp_res_dir/ExcelOutput" ]; then
-        res_root_dir="$tmp_res_dir"
+    # 下载 Resources (检测 ExcelOutput 目录)
+    if [ -d "$resources_dir/ExcelOutput" ]; then
+        log_info "Resources 已存在，跳过下载"
     else
-        # 2. 查找子目录中的 ExcelOutput
-        # 使用 find 查找深度为2的 ExcelOutput 目录
-        local found_excel=$(find "$tmp_res_dir" -mindepth 2 -maxdepth 2 -type d -name "ExcelOutput" | head -n 1)
-        if [ -n "$found_excel" ]; then
-            res_root_dir=$(dirname "$found_excel")
-        fi
+        download_and_extract "$GITHUB_RESOURCES_RELEASES" "resources" "$resources_dir" "ExcelOutput"
     fi
-
-    if [ -n "$res_root_dir" ]; then
-        log_info "定位到资源根目录: $res_root_dir"
-        log_info "正在部署资源文件到 $INSTALL_DIR..."
-        cp -r "$res_root_dir"/* "$INSTALL_DIR/" 2>/dev/null || true
+    
+    # 下载 Config
+    if [ -d "$config_dir" ] && [ "$(ls -A "$config_dir" 2>/dev/null)" ]; then
+        log_info "Config 已存在，跳过下载"
     else
-        log_error "资源目录结构识别失败：未在解压结果中找到 ExcelOutput 目录"
-        rm -rf "$tmp_res_dir"
-        exit 1
-    fi
-
-    rm -rf "$tmp_res_dir"
-
-    # ================================
-    # 2. 下载 Config
-    # ================================
-    log_info "正在获取 Config 下载地址..."
-    local conf_release_info
-    if ! conf_release_info=$(curl -sSL --connect-timeout 5 --retry 3 "$GITHUB_CONFIG_RELEASES" 2>/dev/null); then
-        log_error "无法连接到 GitHub API (Config)"
-        exit 1
-    fi
-
-    local conf_download_url
-    conf_download_url=$(echo "$conf_release_info" | jq -r '.assets[] | select(.name | test("config.*\\.zip"; "i")) | .browser_download_url' 2>/dev/null | head -1)
-    
-    if [ -z "$conf_download_url" ] || [ "$conf_download_url" = "null" ]; then
-         log_warning "未找到 config*.zip Asset，尝试使用源码 zipball..."
-         conf_download_url=$(echo "$conf_release_info" | jq -r '.zipball_url' 2>/dev/null)
-    fi
-
-    if [ -z "$conf_download_url" ] || [ "$conf_download_url" = "null" ]; then
-        log_error "无法获取 Config 下载地址"
-        exit 1
+        download_and_extract "$GITHUB_CONFIG_RELEASES" "config" "$config_dir" ""
     fi
     
-    local conf_filename="config.zip"
-    local config_target_dir="$INSTALL_DIR/Config"
-    mkdir -p "$config_target_dir"
-
-    log_info "正在下载 Config... ($conf_download_url)"
-    if ! wget --show-progress -O "$conf_filename" "$conf_download_url"; then
-        log_error "Config 下载失败"
-        rm -f "$conf_filename"
-        exit 1
-    fi
-
-    log_info "正在解压 Config 到 $config_target_dir..."
-    
-    # 解压到临时目录以处理可能的子目录结构
-    local tmp_config_dir="/tmp/dh_config_tmp"
-    rm -rf "$tmp_config_dir"
-    mkdir -p "$tmp_config_dir"
-    
-    if ! unzip -o -q "$conf_filename" -d "$tmp_config_dir"; then
-        log_error "Config 解压失败"
-        rm -f "$conf_filename"
-        exit 1
-    fi
-    rm -f "$conf_filename"
-    
-    # 智能移动
-    if [ "$(ls -A "$tmp_config_dir" | wc -l)" -eq 1 ] && [ -d "$tmp_config_dir/$(ls -A "$tmp_config_dir")" ]; then
-        local unique_subdir="$tmp_config_dir/$(ls -A "$tmp_config_dir")"
-        cp -r "$unique_subdir"/* "$config_target_dir/"
-    else
-        cp -r "$tmp_config_dir"/* "$config_target_dir/"
-    fi
-    rm -rf "$tmp_config_dir"
-
-    log_success "资源文件 (Resources & Config) 下载并部署完成"
+    log_success "资源文件 (Resources & Config) 部署完成"
 }
 
 
