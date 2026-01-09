@@ -213,7 +213,7 @@ install_dependencies() {
     log_step 2 "检查并安装依赖..."
     
     # 定义所有必需的软件包
-    local deps=("curl" "wget" "git" "unzip" "p7zip-full" "jq" "ca-certificates" "apt-transport-https" "libicu-dev")
+    local deps=("curl" "screen" "wget" "git" "unzip" "p7zip-full" "jq" "ca-certificates" "apt-transport-https" "libicu-dev")
     local missing=()
 
     # 统一通过 dpkg 检查包是否安装
