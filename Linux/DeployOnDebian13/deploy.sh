@@ -181,15 +181,15 @@ change_apt_source() {
     echo "  1) 是 (运行 ChangeSource.sh)"
     echo "  2) 否 (跳过)"
     echo ""
-    read -p "请输入选项 [1/2] (默认: 1): " choice
-    choice=${choice:-1}
+    read -p "请输入选项 [1/2] (默认: 2): " choice
+    choice=${choice:-2}
     
     if [ "$choice" != "1" ]; then
         log_info "已跳过换源"
         return 0
     fi
     
-    local remote_script_url="https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/ChangeSource.sh"
+    local remote_script_url="https://raw.githubusercontent.com/GamblerIX/NDHSM/main/Linux/DeployOnDebian13/ChangeSource.sh"
     local tmp_script="/tmp/ChangeSource.sh"
 
     log_info "正在下载换源脚本..."
@@ -426,7 +426,7 @@ create_shortcut() {
     
     local shortcut_path="/usr/local/bin/DHS"
     local script_path="$INSTALL_DIR/dhs_runner.sh"
-    local remote_dhs_url="https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/DHS.sh"
+    local remote_dhs_url="https://raw.githubusercontent.com/GamblerIX/NDHSM/main/Linux/DeployOnDebian13/DHS.sh"
     
     log_info "正在下载 DHS.sh 启动脚本..."
     if ! curl -sSL --connect-timeout 10 --retry 3 -o "$script_path" "$remote_dhs_url"; then

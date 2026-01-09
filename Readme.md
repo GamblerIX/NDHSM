@@ -9,9 +9,10 @@
 **标准部署（交互模式，可选择软件源）：**
 ```bash
 curl -sSL https://raw.githubusercontent.com/GamblerIX/NDHSM/main/Linux/DeployOnDebian13/deploy.sh | bash
+# 提示是否换源时，默认按回车 [2] 将直接跳过
 ```
 
-**无头模式部署（默认使用阿里云源）：**
+**无头模式部署：**
 ```bash
 curl -sSL https://raw.githubusercontent.com/GamblerIX/NDHSM/main/Linux/DeployOnDebian13/deploy.sh | bash -s -- --headless
 ```
