@@ -8,25 +8,25 @@
 
 **标准部署（交互模式，可选择软件源）：**
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/GamblerIX/NDHSM/main/Linux/DeployOnDebian13/deploy.sh | bash
 ```
 
 **无头模式部署（默认使用阿里云源）：**
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --headless
+curl -sSL https://raw.githubusercontent.com/GamblerIX/NDHSM/main/Linux/DeployOnDebian13/deploy.sh | bash -s -- --headless
 ```
 
 ### Termux 一键部署
 
 #### 第一步（安装 Debian）
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/TermuxToDebian13/setup_debian.sh | bash
+curl -sSL https://raw.githubusercontent.com/GamblerIX/NDHSM/main/Linux/TermuxToDebian13/setup_debian.sh | bash
 debian
 ```
 
 #### 第二步（Termux 专用部署）
 ```bash
-curl -sSL https://raw.githubusercontent.com/GamblerIX/DanHeng/main/NDHSM/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux
+curl -sSL https://raw.githubusercontent.com/GamblerIX/NDHSM/main/Linux/DeployOnDebian13/deploy.sh | bash -s -- --termux
 ```
 
 ## 🎮 启动与管理
